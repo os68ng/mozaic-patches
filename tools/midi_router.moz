@@ -1,0 +1,98 @@
+// MIDI Router
+//
+// Author: os68ng
+// Licence: CC-BY
+//
+//
+// MIDI Router (Channel Selector)
+//
+
+@Description
+MIDI Router allows you to switch the destination channel. Helps you when you use
+a MIDI keyboard to change the destination channel without diving into menus.
+
+Hold and salect multiple outputs.
+
+Configure the names of your devices in the init section.
+@End
+
+@OnLoad
+  ShowLayout 2
+  SetShortName {MIDI Router}
+  Call @Init
+@End
+
+@OnPadDown
+  if numchan = 0
+    for i = 0 to 15
+      LatchPad i, NO
+    endfor
+  endif
+  LatchPad LastPad,NOT PadState LastPad
+  numchan = numchan + 1
+@End
+
+@OnPadUp
+  numchan = numchan - 1
+@End
+
+@OnMidiNoteOn
+  for ch = 0 to 15
+    if PadState ch
+      SendMIDINoteOn ch,MIDINote,MIDIVelocity
+      SetNoteState ch,MIDINote,1
+    endif
+  endfor
+@End
+
+@OnMidiNoteOff
+  for ch = 0 to 15
+    s = GetNoteState ch,MIDINote
+    if s = 1
+      SendMIDINoteOff ch,MIDINote,MIDIVelocity
+      SetNoteState ch,MIDINote,0
+    endif
+  endfor
+@End
+
+@OnMidiInput
+  if MIDICommand <> 0x80 AND MIDICommand <> 0x90
+    for ch = 0 to 15
+      if PadState ch
+        SendMIDIOut MIDICommand+ch,MIDIByte2,MIDIByte3
+      endif
+    endfor
+  endif
+@End
+
+// ========================================
+// Init section
+// You can configure the names here. Replace
+// with spaces when not used (see last channel)
+
+@Init
+  LabelPads {Channel}
+  LabelPad  0, {1         Synth 1}
+  LabelPad  1, {2         Synth 2}
+  LabelPad  2, {3         Synth 3}
+  LabelPad  3, {4         Synth 4}
+  LabelPad  4, {5         Synth 5}
+  LabelPad  5, {6         Synth 6}
+  LabelPad  6, {7         Synth 7}
+  LabelPad  7, {8         Synth 8}
+  LabelPad  8, {9         Synth 9}
+  LabelPad  9, {10       Synth 10}
+  LabelPad 10, {11       Synth 11}
+  LabelPad 11, {12       Synth 12}
+  LabelPad 12, {13       Synth 13}
+  LabelPad 13, {14       Synth 14}
+  LabelPad 14, {15       Synth 15}
+  LabelPad 15, {16               }
+  
+  ResetNoteStates 0
+
+  if Unassigned numchan
+    numchan = 0
+    LatchPad 0,YES
+  endif
+@End
