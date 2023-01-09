@@ -1,0 +1,194 @@
+// Controller template to map external CCs into Mozaic UI and to actual CCs of the instruments.
+// This allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// How to use this template:
+// 0. Replace all XXX with meaningful content :-)
+// 1. Define the knobs in the Mozaic UI (-> InitUI)
+// 2. Assign these knobs to the actual CCs of the target device (-> InitKnobCCMapping)
+// 3. Final step where the external controller comes in: Define the external CCs to the knbos in Mozaic (-> InitCCKnobMapping)
+
+@Description
+XXX Controller
+
+A simple controller frontend for XXX. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values:
+
+SHIFT will send all knob values to the device (some sort of a simple preset manager).
+@End
+
+
+@Config
+  // Midi Channel detection:
+  // Set this to "1" if the incoming midi channel should 
+  // automatically set the destination channel.
+  midichdetect = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {XXX}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDICommand = 0xB0 // CC
+    Call @HandleController
+  else
+    Call @HandleMidiChannelDetection
+    SendMIDIThruOnCh midich
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+// Init section
+// ========================================
+
+@Init
+  Call @Config
+  if Unassigned midich
+    midich = 0
+  endif
+
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+@End
+
+@InitUI
+  // label for each knob
+  LabelKnobs {Controls}
+  LabelKnob 0, { Control 1 }
+  LabelKnob 1, { Control 2 }
+  LabelKnob 2, { }
+  LabelKnob 3, { }
+  LabelKnob 4, { }
+  LabelKnob 5, { }
+  LabelKnob 6, { }
+  LabelKnob 7, { }
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, { }
+  LabelKnob 12, { }
+  LabelKnob 13, { }
+  LabelKnob 14, { }
+  LabelKnob 15, { }
+  LabelKnob 16, { }
+  LabelKnob 17, { }
+  LabelKnob 18, { }
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  // knob for selecting the destination channel
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+
+@End
+
+@InitKnobCCMapping
+  // Knob to CC map
+  // Numbers in brackes are the knobs
+  // Numbers on the right are the actual CCs of the target device
+  FillArray ccmap,0,22
+  ccmap[0] = 0   // Control 1
+  ccmap[1] = 0   // Control 2
+  ccmap[2] = 0   // 
+  ccmap[3] = 0   // 
+  ccmap[4] = 0   // 
+  ccmap[5] = 0   // 
+  ccmap[6] = 0   // 
+  ccmap[7] = 0   // 
+  ccmap[11] = 0  // 
+  ccmap[12] = 0  // 
+  ccmap[13] = 0  // 
+  ccmap[14] = 0  // 
+  ccmap[15] = 0  // 
+  ccmap[16] = 0  // 
+  ccmap[17] = 0  // 
+  ccmap[18] = 0  //  
+  ccmap[19] = 0  //  
+  ccmap[20] = 0  //  
+  @End
+
+@InitCCKnobMapping
+  // Mapping external controller CC to knob.
+  // Numbers in brackets are the CCs.
+  // Numbers on the right are the knobs in Mozaic
+  // Only the used CCs have to be defined here.
+  FillArray ccknob,-1,128
+  ccknob[16] = 0   // CC 16
+  ccknob[17] = 1   // CC 17
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+// handles incoming controllers
+@HandleController
+  Call @HandleMidiChannelDetection
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleMidiChannelDetection
+  if midichdetect = 1 and midich <> MIDIChannel
+    midich = MIDIChannel
+    SetKnobValue 21,midich*8
+    LabelKnob 21, {Chan }, midich+1
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = 0
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> 0
+    SendMIDICC midich, ctrl, cval
+  endif
+@End
