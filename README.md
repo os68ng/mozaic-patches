@@ -15,7 +15,6 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | volca_modular.moz | Controller for Korg Volca Modular (requires MIDI in modification!)  |
 | volca_nubass.moz  | Controller for Korg Volca Nubass |
 | template.moz      | Controller template to build your own |
-| ----- | ----- |
 
 ## tools
 
@@ -23,5 +22,3 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | ----- | ----- |
 | midi_clicktrack.moz | Clicktrack for MIDI only / DAWless setups without having a metronome in a DAW. |
 | midi_router.moz     | A simple switch panel / router to map incoming MIDI to a destination channel.  |
-| ----- | ----- |
-
