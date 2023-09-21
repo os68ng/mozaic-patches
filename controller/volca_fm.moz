@@ -1,0 +1,177 @@
+// Volca FM Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+Volca FM Controller
+
+A simple controller frontend for Volca FM. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+SHIFT will send all knob values to the device (some sort of a simple preset manager).
+@End
+
+@Config
+  midichdetect = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {VFM}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    endif
+  else
+    SendMIDIThruOnCh MIDIChannel
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  if Unassigned midich
+    midich = 0
+  endif
+
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+@End
+
+@InitUI
+  LabelKnobs {Volca FM Controller}
+  LabelKnob 0, {Algorithm}
+  LabelKnob 1, {Mod Att}
+  LabelKnob 2, {Mod Dcy}
+  LabelKnob 3, {Carr Att}
+  LabelKnob 4, {Carr Dcy}
+  LabelKnob 5, {LFO Rate}
+  LabelKnob 6, {LFO PDep}
+  LabelKnob 7, { }
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, {Arp Type}
+  LabelKnob 12, {Arp Div}
+  LabelKnob 13, { }
+  LabelKnob 14, { }
+  LabelKnob 15, { }
+  LabelKnob 16, { }
+  LabelKnob 17, { }
+  LabelKnob 18, { }
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 48   // Algorithm
+  ccmap[1] = 42   // Modulator Attack
+  ccmap[2] = 43   // Modulator Decay
+  ccmap[3] = 44   // Carrier ttack
+  ccmap[4] = 45   // Carrier Decay
+  ccmap[5] = 46   // LFO Type
+  ccmap[6] = 47   // LFO Pitch Depth
+  ccmap[7] = 0   // 
+  ccmap[11] = 49  // Arp Type
+  ccmap[12] = 50  // Arp Div
+  ccmap[13] = 0  // 
+  ccmap[14] = 0  // 
+  ccmap[15] = 0  // 
+  ccmap[16] = 0  // 
+  ccmap[17] = 0  // 
+  ccmap[18] = 0  //  
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  Call @HandleMidiChannelDetection
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleMidiChannelDetection
+  if midichdetect = 1 and midich <> MIDIChannel
+    midich = MIDIChannel
+    SetKnobValue 21,midich*8
+    LabelKnob 21, {Chan }, midich+1
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = 0
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> 0
+    SendMIDICC midich, ctrl, cval
+  endif
+@End

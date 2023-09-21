@@ -1,0 +1,201 @@
+// Volca Beats Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+Volca Beats Controller
+
+A simple controller frontend for Volca Beats. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+SHIFT will send all knob values to the device (some sort of a simple preset manager).
+
+Includes a keymap.
+@End
+
+@Config
+  midichdetect = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {VBeats}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    elseif MIDICommand = 0x90 // NoteOn
+      Call @MidiNoteOn
+    elseif MIDICommand = 0x80 // NoteOff
+      Call @MidiNoteOff
+    endif
+  else
+    SendMIDIThruOnCh MIDIChannel
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+@MidiNoteOn
+  part = MIDINote % 12
+  note = keymap[part]
+  //SendMIDICC MIDIChannel, 40+part, vel
+  SendMIDINoteOn midich, note, MIDIVelocity
+@End
+
+@MidiNoteOff
+  part = MIDINote % 12
+  note = keymap[part]
+  SendMIDINoteOff midich, note, MIDIVelocity  
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  if Unassigned midich
+    midich = 0
+  endif
+
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+  Call @InitKeymap
+@End
+
+@InitUI
+  LabelKnobs {Volca Beats Controller}
+  LabelKnob 0, {St Time}
+  LabelKnob 1, {St Depth}
+  LabelKnob 2, {PCM Clap}
+  LabelKnob 3, {PCM Claves}
+  LabelKnob 4, {PCM Agogo}
+  LabelKnob 5, {PCM Crash}
+  LabelKnob 6, {Lvl Kick}
+  LabelKnob 7, {Lvl Snare}
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, {Lvl LowT}
+  LabelKnob 12, {Lvl HiT}
+  LabelKnob 13, {Lvl ClHH}
+  LabelKnob 14, {Lvl OpHH}
+  LabelKnob 15, {Lvl Clap}
+  LabelKnob 16, {Lvl Clav}
+  LabelKnob 17, {Lvl Agogo}
+  LabelKnob 18, {Lvl Crash}
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 54   // Stutter Time
+  ccmap[1] = 55   // Stutter Depth
+  ccmap[2] = 50   // PCM Speed Clap
+  ccmap[3] = 51   // PCM Speed Claves
+  ccmap[4] = 52   // PCM Speed Agogo
+  ccmap[5] = 53   // PCM Speed Crash
+  ccmap[6] = 40   // Level Kick
+  ccmap[7] = 41   // Level Snare
+  ccmap[11] = 42  // Level Low Tom
+  ccmap[12] = 43  // Level High Tom
+  ccmap[13] = 44  // Level Closed HH
+  ccmap[14] = 45  // Level Open HH
+  ccmap[15] = 46  // Level Clap
+  ccmap[16] = 47  // Level Claves
+  ccmap[17] = 48  // Level Agogo
+  ccmap[18] = 49  // Level Crash 
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+@InitKeymap
+  keymap = [36, 38, 39, 43, 50, 67, 75, 49, 42, 46, 0, 0, 0, 0, 0, 0]
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  Call @HandleMidiChannelDetection
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleMidiChannelDetection
+  if midichdetect = 1 and midich <> MIDIChannel
+    midich = MIDIChannel
+    SetKnobValue 21,midich*8
+    LabelKnob 21, {Chan }, midich+1
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = 0
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> 0
+    SendMIDICC midich, ctrl, cval
+  endif
+@End

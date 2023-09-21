@@ -1,0 +1,175 @@
+// NTS-1 Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+NTS-1 Controller
+
+A simple controller frontend for the NTS-1. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+SHIFT will send all knob values to the device (some sort of a simple preset manager).
+@End
+
+@Config
+  midichdetect = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {NTS-1}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDICommand = 0xB0 // CC
+    Call @HandleController
+  else
+    SendMIDIThruOnCh midich
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  if Unassigned midich
+    midich = 0
+  endif
+
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+@End
+
+@InitUI
+  LabelKnobs {NTS-1 Controller}
+  LabelKnob 0, {OSC Type}
+  LabelKnob 1, {OSC Shape}
+  LabelKnob 2, {OSC Alt}
+  LabelKnob 3, {FLT Type}
+  LabelKnob 4, {FLT Cutoff}
+  LabelKnob 5, {FLT Res}
+  LabelKnob 6, {FLT Sweep}
+  LabelKnob 7, {FLT SwRate}
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, {MOD Time}
+  LabelKnob 12, {MOD Depth}
+  LabelKnob 13, {DLY Time}
+  LabelKnob 14, {DLY Depth}
+  LabelKnob 15, {DLY Mix}
+  LabelKnob 16, {REV Time}
+  LabelKnob 17, {REV Depth}
+  LabelKnob 18, {REV Mix}
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 53   // OSC Type
+  ccmap[1] = 54   // OSC Shape
+  ccmap[2] = 55   // OSC Alt
+  ccmap[3] = 42   // Filter Type
+  ccmap[4] = 43   // Filter Cutoff
+  ccmap[5] = 44   // Filter Resonance
+  ccmap[6] = 45   // Filter Sweep
+  ccmap[7] = 46   // Filter Sweep Rate
+  ccmap[11] = 28  // Modulation Time
+  ccmap[12] = 29  // Modulation Depth
+  ccmap[13] = 30  // Delay Time
+  ccmap[14] = 31  // Delay Depth
+  ccmap[15] = 33  // Delay Mix
+  ccmap[16] = 34  // Reverb Time
+  ccmap[17] = 35  // Reverb Depth
+  ccmap[18] = 36  // Reverb Mix 
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  Call @HandleMidiChannelDetection
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleMidiChannelDetection
+  if midichdetect = 1 and midich <> MIDIChannel
+    midich = MIDIChannel
+    SetKnobValue 21,midich*8
+    LabelKnob 21, {Chan }, midich+1
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = 0
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> 0
+    SendMIDICC midich, ctrl, cval
+  endif
+@End

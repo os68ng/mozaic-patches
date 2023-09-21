@@ -1,0 +1,177 @@
+// Volca Kick Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+Volca Kick Controller
+
+A simple controller frontend for Volca Kick. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+SHIFT will send all knob values to the device (some sort of a simple preset manager).
+@End
+
+@Config
+  midichdetect = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {VKick}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    endif
+  else
+    SendMIDIThruOnCh MIDIChannel
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  if Unassigned midich
+    midich = 0
+  endif
+
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+@End
+
+@InitUI
+  LabelKnobs {Volca Kick Controller}
+  LabelKnob 0, {Pulse Col}
+  LabelKnob 1, {Pulse Lev}
+  LabelKnob 2, {Amp Att}
+  LabelKnob 3, {Amp Dec}
+  LabelKnob 4, {Drive}
+  LabelKnob 5, {Tone}
+  LabelKnob 6, {Accent}
+  LabelKnob 7, { }
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, {Res Pitch}
+  LabelKnob 12, {Res Bend}
+  LabelKnob 13, {Res Time}
+  LabelKnob 14, { }
+  LabelKnob 15, { }
+  LabelKnob 16, { }
+  LabelKnob 17, { }
+  LabelKnob 18, { }
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 40   // Pulse Color
+  ccmap[1] = 41   // Pulse Level
+  ccmap[2] = 42   // Amp Attack
+  ccmap[3] = 43   // Amp Decay
+  ccmap[4] = 44   // Drive
+  ccmap[5] = 45   // Tone
+  ccmap[6] = 49   // Accent
+  ccmap[7] = 0   // 
+  ccmap[11] = 46  // Resonator Pitch
+  ccmap[12] = 47  // Resonator Bend
+  ccmap[13] = 48  // Resonator Time
+  ccmap[14] = 0  // 
+  ccmap[15] = 0  // 
+  ccmap[16] = 0  // 
+  ccmap[17] = 0  // 
+  ccmap[18] = 0  //  
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  Call @HandleMidiChannelDetection
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleMidiChannelDetection
+  if midichdetect = 1 and midich <> MIDIChannel
+    midich = MIDIChannel
+    SetKnobValue 21,midich*8
+    LabelKnob 21, {Chan }, midich+1
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = 0
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> 0
+    SendMIDICC midich, ctrl, cval
+  endif
+@End
