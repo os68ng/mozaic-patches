@@ -3,6 +3,7 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 
 ## controller
 
+| Patch | Description |
 | ----- | ----- |
 | monologue.moz     | Controller for Korg Monologue   |
 | nts1.moz          | Controller for Korg NTS-1       |
@@ -18,6 +19,7 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 
 ## tools
 
+| Patch | Description |
 | ----- | ----- |
 | midi_clicktrack.moz | Clicktrack for MIDI only / DAWless setups without having a metronome in a DAW. |
 | midi_router.moz     | A simple switch panel / router to map incoming MIDI to a destination channel.  |
