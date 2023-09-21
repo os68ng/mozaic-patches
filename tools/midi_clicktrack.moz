@@ -1,0 +1,53 @@
+// MIDI Clicktrack
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+//
+// freedom for your MIDI click
+//
+// TODO:
+// - Channel
+// - Note Beat
+// - Note Bar
+// - Velocity (BeatVelo = BarVelo - 20)
+
+@Description
+MIDI Clicktrack allows you to send the metronome clicks to a MIDI device.
+Interesting when you have a MIDI only setup without DAW audio for the metronome.
+Follows the host beat and measure.
+@End
+
+@OnLoad
+  ShowLayout 2
+  SetShortName {MIDI Clicktrack}
+  LabelPads {Beats}
+  Call @Init
+@End
+
+@OnNewBar
+  FlashPad 0
+  SendMIDINoteOn ctchan, ctbarnote, ctbarvel 
+  SendMIDINoteOff ctchan, ctbarnote, ctbarvel, ctnotelen
+@End
+
+@OnNewBeat
+  if HostBeat <> 0
+    FlashPad HostBeat
+    SendMIDINoteOn ctchan, ctbeatnote, ctbeatvel 
+    SendMIDINoteOff ctchan, ctbeatnote, ctbeatvel, ctnotelen
+  endif
+@End
+
+// ========================================
+
+// Here you can define the channel, note and velocity
+@Init
+  ctchan = 10
+  ctbarnote = 60
+  ctbarvel = 100
+  ctbeatnote = 65
+  ctbeatvel = 80
+  ctnotelen = 50
+@End
