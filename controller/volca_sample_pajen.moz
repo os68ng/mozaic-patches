@@ -1,0 +1,173 @@
+// Volca Sample (Pajen Firmware) Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+Volca Sample (Pajen firmware) Controller
+
+A simple controller frontend for Volca Sample with Pajen firmware. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+This controller requires to activate sequencer channel 11 on the Volca Sample. To access the different parts you have to change them via the part dial.
+
+SHIFT will send all knob values for the selected part to the device (some sort of a simple preset manager).
+@End
+
+@Config
+  midich = 11
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {VSample}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    else
+      SendMIDIThruOnCh MIDIChannel
+    endif
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  part = 0
+  Call @InitUI
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+@End
+
+@InitUI
+  LabelKnobs {Volca Sample (Pajen firmware) Controller}
+  LabelKnob 0, {Sample Start}
+  LabelKnob 1, {Sample Len}
+  LabelKnob 2, {Hi Cut}
+  LabelKnob 3, {Speed}
+  LabelKnob 4, {Amp Att}
+  LabelKnob 5, {Amp Decay}
+  LabelKnob 6, {Level}
+  LabelKnob 7, {Pan}
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, {PEG Att}
+  LabelKnob 12, {PEG Dcy}
+  LabelKnob 13, {PEG Sust}
+  LabelKnob 14, { }
+  LabelKnob 15, { }
+  LabelKnob 16, { }
+  LabelKnob 17, { }
+  LabelKnob 18, { }
+  LabelKnob 19, { }
+  LabelKnob 20, { }
+
+  SetKnobValue 21,part*12
+  LabelKnob 21, {Part }, part+1
+
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 20   // Sample Start
+  ccmap[1] = 30   // Sample Length
+  ccmap[2] = 40   // Hi Cut
+  ccmap[3] = 50   // Speed
+  ccmap[4] = 90   // Amp Attack
+  ccmap[5] = 100  // Amp Decay
+  ccmap[6] = 0    // Level
+  ccmap[7] = 10   // Pan
+  ccmap[11] = 60  // PEG Attack
+  ccmap[12] = 70  // PEG Decay
+  ccmap[13] = 80  // PEG Sustain
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+@InitCCStore
+  FillArray ccstore,-1,200
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = -1
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21
+    lastpart = part
+    part = Div cval, 12
+    if lastpart <> part
+      for i = 0 to 19
+        ccstore[lastpart+i] = GetKnobValue i
+        SetKnobValue i, part+i
+      endfor
+    endif
+    LabelKnob 21, {Part }, part+1
+  else
+    ctrl = ccmap[LastKnob]
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> -1
+    SendMIDICC midich, ctrl+part, cval
+  endif
+@End
