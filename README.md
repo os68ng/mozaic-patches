@@ -14,6 +14,7 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | volca_kick.moz    | Controller for Korg Volca Kick  |
 | volca_modular.moz | Controller for Korg Volca Modular (requires MIDI in modification!)  |
 | volca_nubass.moz  | Controller for Korg Volca Nubass |
+| volca_sample_pajen.moz | Controller for Korg Volca Sample with Pajen firmware |
 | template.moz      | Controller template to build your own |
 
 ## tools
