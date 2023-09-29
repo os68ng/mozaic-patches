@@ -6,6 +6,7 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | Patch | Description |
 | ----- | ----- |
 | monologue.moz     | Controller for Korg Monologue   |
+| monologue_native.moz | Controller for Korg Monologue with native controller mapping |
 | nts1.moz          | Controller for Korg NTS-1       |
 | volca_bass.moz    | Controller for Korg Volca Bass  |
 | volca_beats.moz   | Controller for Korg Volca Beats |
