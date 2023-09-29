@@ -55,6 +55,7 @@ SHIFT will send all knob values for the selected part to the device (some sort o
   Call @InitUI
   Call @InitKnobCCMapping
   Call @InitCCKnobMapping
+  Call @InitCCStore
 @End
 
 @InitUI
