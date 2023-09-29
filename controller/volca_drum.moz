@@ -1,0 +1,186 @@
+// Volca Drum Controller
+//
+// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
+// You can also use this template without an external controller.
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: CC-BY
+//
+
+@Description
+Volca Drum Controller
+
+A simple controller frontend for Volca Drum. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
+
+This controller requires to configure the Volca Drum to one specific MIDI channel.
+
+SHIFT will send all knob values for the selected part to the device.
+@End
+
+@Config
+  midich = 0
+@End
+
+@OnLoad
+  ShowLayout 1
+  SetShortName {VDrum}
+  Call @Init
+@End
+
+@OnShiftDown
+  Call @SendAllKnobs
+@End
+
+@OnMidiInput
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    else
+      SendMIDIThruOnCh MIDIChannel
+    endif
+  endif
+@End
+
+@OnKnobChange
+  Call @HandleKnobChange
+@End
+
+// ========================================
+
+@Init
+  Call @Config
+  part = 0
+  Call @InitUI
+  Call @InitPartOffsets
+  Call @InitKnobCCMapping
+  Call @InitCCKnobMapping
+  Call @InitCCStore
+@End
+
+@InitUI
+  LabelKnobs {Volca Drum Controller}
+  LabelKnob 0, {Layer}
+  LabelKnob 1, {Level}
+  LabelKnob 2, {Mod Amount}
+  LabelKnob 3, {Pitch}
+  LabelKnob 4, {EG Attack}
+  LabelKnob 5, {EG Release}
+  LabelKnob 6, {Level}
+  LabelKnob 7, {Pan}
+  LabelKnob 8, { }
+  LabelKnob 9, { }
+  LabelKnob 10, { }
+  LabelKnob 11, { }
+  LabelKnob 12, { }
+  LabelKnob 13, { }
+  LabelKnob 14, { }
+  LabelKnob 15, { }
+  LabelKnob 16, { }
+  LabelKnob 17, { }
+  LabelKnob 18, { }
+  LabelKnob 19, { }
+
+  SetKnobValue 20,part*22
+  LabelKnob 20, {Part }, part+1
+
+  SetKnobValue 21,midich*8
+  LabelKnob 21, {Chan }, midich+1
+@End
+
+@InitPartOffsets
+  FillArray ccoffset,0,6
+  ccsend_base = 103
+  ccpan_base = 109
+  ccoffset[0] = 14
+  ccoffset[1] = 23
+  ccoffset[2] = 46
+  ccoffset[3] = 55
+  ccoffset[4] = 80
+  ccoffset[5] = 89
+@End
+
+@InitKnobCCMapping
+  FillArray ccmap,0,22
+  ccmap[0] = 0   // Select Layer
+  ccmap[1] = 1   // Level
+  ccmap[2] = 2   // Mod Amount
+  ccmap[3] = 3   // Pitch
+  ccmap[4] = 4   // EG Attack
+  ccmap[5] = 5   // EG Release
+@End
+
+@InitCCKnobMapping
+  FillArray ccknob,-1,128
+  ccknob[16] = 0
+  ccknob[17] = 1
+  ccknob[18] = 2
+  ccknob[19] = 3
+  ccknob[20] = 4
+  ccknob[21] = 5
+  ccknob[22] = 6
+  ccknob[23] = 7
+  ccknob[24] = 11
+  ccknob[25] = 12
+  ccknob[26] = 13
+  ccknob[27] = 14
+  ccknob[28] = 15
+  ccknob[29] = 16
+  ccknob[30] = 17
+  ccknob[31] = 18
+@End
+
+@InitCCStore
+  FillArray ccstore,-1,200
+@End
+
+// ========================================
+// from lib
+// ========================================
+
+@HandleController
+  kidx = ccknob[MIDIByte2]
+  if kidx >= 0
+    ctrl = ccmap[kidx]
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  endif
+@End
+
+@HandleKnobChange
+  ctrl = -1
+  cval = GetKnobValue LastKnob
+  if LastKnob = 21 // MIDI channel
+    midich = Div cval, 8
+    LabelKnob 21, {Chan }, midich+1
+  elseif LastKnob = 20 // Part
+    part = Div cval, 22
+    LabelKnob 20, {Part }, part+1
+  elseif LastKnob = 6 // Send
+    ctrl = ccsend_base+part
+    Call @SendCC
+  elseif LastKnob = 7 // Pan
+    ctrl = ccpan_base+part
+    Call @SendCC
+  elseif LastKnob <= 5 // Controller
+    ctrl = ccoffset[part]+LastKnob
+    Call @SendCC
+  endif
+  Call @SendCC
+@End
+
+@SendAllKnobs
+  for i = 0 to 20
+    ctrl = ccmap[i]
+    cval = GetKnobValue i
+    Call @SendCC
+  endfor
+@End
+
+@SendCC
+  if ctrl <> -1
+    SendMIDICC midich, ctrl+part, cval
+  endif
+@End
