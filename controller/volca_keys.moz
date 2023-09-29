@@ -35,9 +35,9 @@ SHIFT will send all knob values to the device (some sort of a simple preset mana
   if MIDIChannel = midich
     if MIDICommand = 0xB0 // CC
       Call @HandleController
+    else
+      SendMIDIThruOnCh MIDIChannel
     endif
-  else
-    SendMIDIThruOnCh MIDIChannel
   endif
 @End
 

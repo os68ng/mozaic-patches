@@ -1,10 +1,8 @@
-// Volca Modular Controller
+// Monologue Controller
 //
-// This controller allows you to maintain a fixed configuration on the external controller (like Beatstep Pro or any other).
+// This controller reflects the changes of the Monologue controller changes.
 // Furthermore you have a control panel in Mozaic where you can see and modify all values in one place.
 // You can also use this template without an external controller.
-//
-// IMPORTANT: You need a MIDI-in modification for the Volca Modular!
 //
 // Author: os68ng
 // Version: 1.0
@@ -12,11 +10,9 @@
 //
 
 @Description
-Volca Modular Controller
+Monologue Controller Native
 
-A simple controller frontend for Volca Modular. Also supports external controllers like BeatStep (Pro) for easy mapping and visualization of the values.
-
-IMPORTANT: You need a MIDI-in modification for the Volca Modular!
+A simple controller frontend for Monologue. Mapping matches Monolugue controllers.
 
 SHIFT will send all knob values to the device (some sort of a simple preset manager).
 @End
@@ -27,7 +23,7 @@ SHIFT will send all knob values to the device (some sort of a simple preset mana
 
 @OnLoad
   ShowLayout 1
-  SetShortName {VModular}
+  SetShortName {Monologue Native}
   Call @Init
 @End
 
@@ -63,26 +59,26 @@ SHIFT will send all knob values to the device (some sort of a simple preset mana
 @End
 
 @InitUI
-  LabelKnobs {Volca Modular Controller}
-  LabelKnob 0, {Ratio}
-  LabelKnob 1, {Fold}
-  LabelKnob 2, {Mod}
-  LabelKnob 3, {Attack}
-  LabelKnob 4, {Release}
-  LabelKnob 5, {Shape}
-  LabelKnob 6, {Time}
-  LabelKnob 7, {Reverb}
+  LabelKnobs {Monologue Controller Native}
+  LabelKnob 0, {VCO1 Wave}
+  LabelKnob 1, {VCO1 Shp}
+  LabelKnob 2, {VCO1 Level}
+  LabelKnob 3, {VCO2 Wave}
+  LabelKnob 4, {VCO2 Oct}
+  LabelKnob 5, {VCO2 Shp}
+  LabelKnob 6, {VCO2 Level}
+  LabelKnob 7, {Sync/Ring}
   LabelKnob 8, { }
   LabelKnob 9, { }
   LabelKnob 10, { }
-  LabelKnob 11, {Cutoff 1}
-  LabelKnob 12, {Cutoff 2}
-  LabelKnob 13, { }
-  LabelKnob 14, { }
-  LabelKnob 15, { }
-  LabelKnob 16, { }
-  LabelKnob 17, { }
-  LabelKnob 18, { }
+  LabelKnob 11, {VCF Cutoff}
+  LabelKnob 12, {VCF Reso}
+  LabelKnob 13, {LFO Rate}
+  LabelKnob 14, {LFO Depth}
+  LabelKnob 15, {EG Attack}
+  LabelKnob 16, {EG Decay}
+  LabelKnob 17, {EG Int}
+  LabelKnob 18, {Drive}
   LabelKnob 19, { }
   LabelKnob 20, { }
 
@@ -93,42 +89,42 @@ SHIFT will send all knob values to the device (some sort of a simple preset mana
 
 @InitKnobCCMapping
   FillArray ccmap,0,22
-  ccmap[0] = 40   // Ratio
-  ccmap[1] = 41   // Fold
-  ccmap[2] = 42   // Mod
-  ccmap[3] = 43   // Attack
-  ccmap[4] = 44   // Release
-  ccmap[5] = 45   // Shape
-  ccmap[6] = 46   // Time
-  ccmap[7] = 49   // Reverb
-  ccmap[11] = 47  // Cutoff 1
-  ccmap[12] = 48  // Cutoff 2
-  ccmap[13] = 0  // 
-  ccmap[14] = 0  // 
-  ccmap[15] = 0  // 
-  ccmap[16] = 0  // 
-  ccmap[17] = 0  // 
-  ccmap[18] = 0  //  
+  ccmap[0] = 50   // VCO1 Wave
+  ccmap[1] = 36   // VCO1 Shape
+  ccmap[2] = 39   // VCO1 Level
+  ccmap[3] = 51   // VCO2 Wave
+  ccmap[4] = 49   // VCO2 Octave
+  ccmap[5] = 37   // VCO2 Shape
+  ccmap[6] = 40   // VCO2 Level
+  ccmap[7] = 61   // Sync/Ring
+  ccmap[11] = 43  // VCF Cutoff
+  ccmap[12] = 44  // VCF Resonance
+  ccmap[13] = 24  // LFO Rate
+  ccmap[14] = 26  // LFO Depth
+  ccmap[15] = 16  // EG Attack
+  ccmap[16] = 17  // EG Decay
+  ccmap[17] = 25  // EG Int
+  ccmap[18] = 28  // Drive
 @End
 
 @InitCCKnobMapping
   FillArray ccknob,-1,128
-  ccknob[16] = 0
-  ccknob[17] = 1
-  ccknob[18] = 2
-  ccknob[19] = 3
-  ccknob[20] = 4
-  ccknob[21] = 5
-  ccknob[22] = 6
-  ccknob[23] = 7
-  ccknob[24] = 11
-  ccknob[25] = 12
-  ccknob[26] = 13
-  ccknob[27] = 14
-  ccknob[28] = 15
-  ccknob[29] = 16
-  ccknob[30] = 17
-  ccknob[31] = 18
+  ccknob[50] = 0
+  ccknob[36] = 1
+  ccknob[39] = 2
+  ccknob[51] = 3
+  ccknob[49] = 4
+  ccknob[37] = 5
+  ccknob[40] = 6
+  ccknob[61] = 7
+  ccknob[43] = 11
+  ccknob[44] = 12
+  ccknob[24] = 13
+  ccknob[26] = 14
+  ccknob[16] = 15
+  ccknob[17] = 16
+  ccknob[25] = 17
+  ccknob[28] = 18
 @End
 
 // ========================================

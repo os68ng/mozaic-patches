@@ -20,7 +20,7 @@ SHIFT will send all knob values for the selected part to the device (some sort o
 @End
 
 @Config
-  midich = 11
+  midich = 10
 @End
 
 @OnLoad
@@ -147,8 +147,8 @@ SHIFT will send all knob values for the selected part to the device (some sort o
     part = Div cval, 12
     if lastpart <> part
       for i = 0 to 19
-        ccstore[lastpart+i] = GetKnobValue i
-        SetKnobValue i, part+i
+        ccstore[lastpart*20+i] = GetKnobValue i
+        SetKnobValue i, ccstore[part*20+i]
       endfor
     endif
     LabelKnob 21, {Part }, part+1

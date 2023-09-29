@@ -32,11 +32,12 @@ SHIFT will send all knob values to the device (some sort of a simple preset mana
 @End
 
 @OnMidiInput
-  if MIDICommand = 0xB0 // CC
-    Call @HandleController
-  else
-    Call @HandleMidiChannelDetection
-    SendMIDIThruOnCh midich
+  if MIDIChannel = midich
+    if MIDICommand = 0xB0 // CC
+      Call @HandleController
+    else
+      SendMIDIThruOnCh MIDIChannel
+    endif
   endif
 @End
 
