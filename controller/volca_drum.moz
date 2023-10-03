@@ -26,6 +26,7 @@ SHIFT will send all knob values for the selected part to the device.
 
 @Config
   midich = 0
+  debug = 0
 @End
 
 @OnLoad
@@ -69,12 +70,12 @@ SHIFT will send all knob values for the selected part to the device.
   LabelKnob 0, {Select}
   LabelKnob 1, {Level}
   LabelKnob 2, {Mod Amt}
-  LabelKnob 3, {Pitch}
-  LabelKnob 4, {EG Attack}
-  LabelKnob 5, {EG Release}
-  LabelKnob 6, {Level}
-  LabelKnob 7, {Pan}
-  LabelKnob 8, { }
+  LabelKnob 3, {Mod Rate}
+  LabelKnob 4, {Pitch}
+  LabelKnob 5, {EG Attack}
+  LabelKnob 6, {EG Release}
+  LabelKnob 7, {Send}
+  LabelKnob 8, {Pan}
   LabelKnob 9, { }
   LabelKnob 10, { }
   LabelKnob 11, { }
@@ -108,12 +109,13 @@ SHIFT will send all knob values for the selected part to the device.
 
 @InitKnobCCMapping
   FillArray ccmap,0,22
-  ccmap[0] = 0   // Select Layer
+  ccmap[0] = 0   // Select
   ccmap[1] = 1   // Level
   ccmap[2] = 2   // Mod Amount
-  ccmap[3] = 3   // Pitch
-  ccmap[4] = 4   // EG Attack
-  ccmap[5] = 5   // EG Release
+  ccmap[3] = 3   // Mod Rate
+  ccmap[4] = 4   // Pitch
+  ccmap[5] = 5   // EG Attack
+  ccmap[6] = 6   // EG Release
 @End
 
 @InitCCKnobMapping
@@ -146,8 +148,18 @@ SHIFT will send all knob values for the selected part to the device.
 
 @HandleController
   kidx = ccknob[MIDIByte2]
-  if kidx >= 0
-    ctrl = ccmap[kidx]
+  if kidx = 7 // Send
+    ctrl = ccsend_base+part
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  elseif kidx = 8 // Pan
+    ctrl = ccpan_base+part
+    cval = MIDIByte3
+    SetKnobValue kidx,cval
+    Call @SendCC
+  elseif kidx >= 0 and kidx <= 6
+    ctrl = ccoffset[part] + ccmap[kidx]
     cval = MIDIByte3
     SetKnobValue kidx,cval
     Call @SendCC
@@ -163,17 +175,16 @@ SHIFT will send all knob values for the selected part to the device.
   elseif LastKnob = 20 // Part
     part = Div cval, 22
     LabelKnob 20, {Part }, part+1
-  elseif LastKnob = 6 // Send
+  elseif LastKnob = 7 // Send
     ctrl = ccsend_base+part
     Call @SendCC
-  elseif LastKnob = 7 // Pan
+  elseif LastKnob = 8 // Pan
     ctrl = ccpan_base+part
     Call @SendCC
-  elseif LastKnob <= 5 // Controller
+  elseif LastKnob <= 6 // Controller
     ctrl = ccoffset[part]+LastKnob
     Call @SendCC
   endif
-  Call @SendCC
 @End
 
 @SendAllKnobs
@@ -186,6 +197,9 @@ SHIFT will send all knob values for the selected part to the device.
 
 @SendCC
   if ctrl <> -1
-    SendMIDICC midich, ctrl+part, cval
+    SendMIDICC midich, ctrl, cval
+    if debug = 1
+      Log {Channel },midich,{ Ctrl },ctrl,{ Value },cval
+    endif
   endif
 @End
