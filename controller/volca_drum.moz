@@ -43,6 +43,10 @@ SHIFT will send all knob values for the selected part to the device.
   if MIDIChannel = midich
     if MIDICommand = 0xB0 // CC
       Call @HandleController
+    elseif MIDICommand = 0x90 // NoteOn
+      Call @MidiNoteOn
+    elseif MIDICommand = 0x80 // NoteOff
+      Call @MidiNoteOff
     else
       SendMIDIThruOnCh MIDIChannel
     endif
@@ -51,6 +55,19 @@ SHIFT will send all knob values for the selected part to the device.
 
 @OnKnobChange
   Call @HandleKnobChange
+@End
+
+@MidiNoteOn
+  part = MIDINote % 12
+  note = 60+part
+  //SendMIDICC MIDIChannel, 40+part, vel
+  SendMIDINoteOn midich, note, MIDIVelocity
+@End
+
+@MidiNoteOff
+  part = MIDINote % 12
+  note = 60+part
+  SendMIDINoteOff midich, note, MIDIVelocity  
 @End
 
 // ========================================
