@@ -9,6 +9,11 @@
 // Licence: CC-BY
 //
 
+// TODO:
+// - Limit "Select"-Value?
+// - Check Part mapping (error in documentation?)
+// - Part Values when changing the part (see Volca Sample)
+
 @Description
 Volca Drum Controller
 
@@ -61,9 +66,9 @@ SHIFT will send all knob values for the selected part to the device.
 
 @InitUI
   LabelKnobs {Volca Drum Controller}
-  LabelKnob 0, {Layer}
+  LabelKnob 0, {Select}
   LabelKnob 1, {Level}
-  LabelKnob 2, {Mod Amount}
+  LabelKnob 2, {Mod Amt}
   LabelKnob 3, {Pitch}
   LabelKnob 4, {EG Attack}
   LabelKnob 5, {EG Release}
