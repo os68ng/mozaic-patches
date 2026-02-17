@@ -1,0 +1,477 @@
+// Arpeggiator
+
+@Description
+A simple Arpeggiator
+@End
+
+@OnLoad
+  debug = YES
+  maxnotes = 8
+  ShowLayout 2
+  SetShortName {Arpeggiator}
+  Call @Init
+@End
+
+@OnMidiNoteOn
+  keyPressed[MIDINote] = YES
+  if latch and noteVelocity[MIDINote] > 0
+    note = MIDINote
+    Call @NoteOff
+  elseif numnotes < maxnotes
+    notes[numnotes] = MIDINote
+    numnotes = numnotes + 1
+    noteVelocity[MIDINote] = MIDIVelocity
+  endif
+  Call @CreateOrderedNoteList
+  Call @DebugNoteList
+@End
+
+@OnMidiNoteOff
+  keyPressed[MIDINote] = NO
+  if not latch
+    note = MIDINote
+    Call @NoteOff
+  endif
+@End
+
+@NoteOff
+  if numnotes > 0
+    for n = 0 to (numnotes - 1)
+      if notes[n] = note
+        notes[n] = -1
+        numnotes = numnotes - 1
+        if noteindex > numnotes
+          noteindex = numnotes
+        endif
+        noteVelocity[note] = 0
+        Call @CompressNoteList
+        Call @CreateOrderedNoteList
+        Call @DebugNoteList
+        Exit
+      endif
+    endfor
+  endif
+@End
+
+@OnMidiInput
+  if MIDICommand <> 0x80 AND MIDICommand <> 0x90
+    SendMIDIOut (MIDICommand + MIDIChannel),MIDIByte2,MIDIByte3
+  endif
+@End
+
+@OnMetroPulse
+  FlashUserLed
+  if HostTempo > 0
+    notelen = (60.0 / HostTempo) / (Pow 2, (division)) * 1000.0 * gate / 100.0
+    if triplets
+      notelen = notelen * (2.0 / 3.0)
+    endif
+    if numnotes > 0
+      if mode = 0
+        Call @ArpUp
+      elseif mode = 1
+        Call @ArpDown
+      elseif mode = 2
+        Call @ArpUpDown
+      elseif mode = 3
+        Call @ArpOrder
+      elseif mode = 4
+        Call @ArpRandom
+      endif
+    endif
+  endif
+@End
+
+@ArpUp
+  note = notesOrd[noteindex]
+  Call @GetVelocity
+  note = note + (octindex * 12)
+  if note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+  noteindex = noteindex + 1
+  if noteindex >= numnotes
+    noteindex = 0
+    octindex = octindex + 1
+    if octindex > octave - 1
+      octindex = 0
+    endif
+  endif
+@End
+
+@ArpDown
+  note = notesOrd[noteindex]
+  Call @GetVelocity
+  note = note + (octindex * 12)
+  if note < 0 or note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+  noteindex = noteindex - 1
+  if noteindex < 0
+    noteindex = numnotes - 1
+    octindex = octindex - 1
+    if octindex < 0
+      octindex = octave - 1
+    endif
+  endif
+@End
+
+@ArpUpDown
+  note = notesOrd[noteindex]
+  Call @GetVelocity
+  note = note + (octindex * 12)
+  if note < 0 or note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+  noteindex = noteindex + step
+  if noteindex >= numnotes
+    octindex = octindex + step
+    if octindex > octave - 1
+      octindex = octave - 1
+      step = -1
+      noteindex = numnotes - 1
+    else
+      noteindex = 0
+    endif
+  endif
+  if noteindex < 0
+    octindex = octindex + step
+    if octindex < 0
+      octindex = 0
+      step = 1
+      noteindex = 0
+    else
+      noteindex = numnotes - 1
+    endif
+  endif
+@End
+
+@ArpOrder
+  note = notes[noteindex]
+  Call @GetVelocity
+  note = note + (octindex * 12)
+  if note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+  noteindex = noteindex + 1
+  if noteindex >= numnotes
+    octindex = octindex + 1
+    if octindex > octave - 1
+      octindex = 0
+    endif
+    noteindex = 0
+  endif
+@End
+
+@ArpRandom
+  nidx = Random 0, numnotes - 1
+  oidx = Random 0, octave - 1
+  note = notesOrd[nidx]
+  Call @GetVelocity
+  note = note + (oidx * 12)
+  if note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+@End
+
+@GetVelocity
+  if fixedVelo
+    velo = 120
+  else
+    velo = noteVelocity[note]
+  endif
+@End
+
+@AllNotesOff
+  newnumnotes = numnotes
+  for n = 0 to (numnotes - 1)
+    note = notes[n]
+    if not keyPressed[note]
+      notes[n] = -1
+      noteVelocity[note] = 0
+      newnumnotes = newnumnotes - 1
+    endif
+  endfor
+  numnotes = newnumnotes
+  if noteindex > numnotes
+    noteindex = numnotes
+  endif
+  Call @CompressNoteList
+  Call @CreateOrderedNoteList
+  Call @DebugNoteList
+@End
+
+@CompressNoteList
+  FillArray newnotes, -1, maxnotes
+  nn = 0
+  for n = 0 to maxnotes - 1
+    if notes[n] <> -1
+      newnotes[nn] = notes[n]
+      nn = nn + 1
+    endif
+  endfor
+  CopyArray newnotes, notes, 8
+@End
+
+@CreateOrderedNoteList
+  //FillArray notesOrd, -1, maxnotes
+  if numnotes > 0
+    for n = 0 to numnotes - 1
+      gcount = 0
+      for m = 0 to numnotes - 1
+        if notes[n] > notes[m]
+          gcount = gcount + 1
+        endif
+      endfor
+      notesOrd[gcount] = notes[n]
+    endfor
+  endif
+@End
+
+@OnPadDown
+  pad = LastPad
+  if pad >= 0 and pad <= 3
+    Call @SetDivision
+  elseif pad = 4
+    Call @SetTriplets
+  elseif pad >= 8 and pad <= 12
+    Call @SetMode
+  elseif pad = 14
+    Call @SetLatch
+  elseif pad = 15
+    Call @SetFixedVelocity
+  endif
+@End
+
+@OnKnobChange
+  knob = LastKnob
+  if knob = 0
+    Call @SetSwing
+  elseif knob = 1
+    Call @SetGate
+  elseif knob = 2
+    Call @SetOctave
+  elseif knob = 3
+    Call @SetProbability
+  endif
+@End
+
+@SetDivision
+  lastdiv = division
+  division = LastPad
+  LatchPad 0 + lastdiv, NO
+  LatchPad LastPad, YES
+  // TODO triplets
+  SetMetroPPQN (Pow 2, division)
+@End
+
+@SetTriplets
+  if triplets = NO
+    triplets = YES
+  else
+    triplets = NO
+  endif
+  LatchPad 4, triplets
+@End
+
+@SetMode
+  lastmode = mode
+  mode = LastPad - 8
+  LatchPad 8 + lastmode, NO
+  LatchPad LastPad, YES
+  if mode = 1
+    step = -1
+    noteindex = numnotes - 1
+    octindex = octave - 1
+  else
+    step = 1
+    noteindex = 0
+  endif
+  octindex = 0
+@End
+
+@SetLatch
+  if latch = NO
+    latch = YES
+  else
+    latch = NO
+    Call @AllNotesOff
+  endif
+  LatchPad 14, latch
+@End
+
+@SetFixedVelocity
+  if fixedvelo = NO
+    fixedvelo = YES
+  else
+    fixedvelo = NO
+  endif
+  LatchPad 15, fixedvelo
+@End
+
+@SetSwing
+  knobval = GetKnobValue 0
+  swing = Round (knobval / 127.0 * 100)
+  Call @UpdateSwingValue 
+@End
+
+@UpdateSwingValue
+  LabelKnob 0, {Swng }, swing, {%}
+  SetMetroSwing swing
+@End
+
+@SetGate
+  knobval = GetKnobValue 1
+  gate = Round (knobval / 127.0 * 100)
+  Call @UpdateGateValue
+@End
+
+@UpdateGateValue
+  LabelKnob 1, {Gate }, gate, {%}
+@End
+
+@SetOctave
+  knobval = GetKnobValue 2
+  octave = Round (knobval / 127.0 * 3 + 1)
+  Call @UpdateOctaveValue
+@End
+
+@UpdateOctaveValue
+  LabelKnob 2, {Octave }, octave
+@End
+
+@SetProbability
+  knobval = GetKnobValue 3
+  probability = Round (knobval / 127.0 * 100)
+  Call @UpdateProbabilityValue
+@End
+
+@UpdateProbabilityValue
+  LabelKnob 3, {Prob }, probability, {%}
+@End
+
+// ====================================
+
+@Init
+  swing = 0
+  gate = 50
+  octave = 1
+  probability = 100
+
+  division = 0
+  triplets = NO
+  mode = 0
+  latch = NO
+  fixedvelo = NO
+
+  midich = 0
+
+  // TODO triplets
+  SetMetroPPQN (Pow 2, division)
+
+  Call @InitUI
+  Call @InitArp
+@End
+
+@InitUI
+  divisioncolor = 4
+  tripletcolor = 5
+  modecolor = 6
+  utilitycolor = 2
+
+  LabelPad  0, {1/4}
+  ColorPad 0, divisioncolor
+  LabelPad  1, {1/8}
+  ColorPad 1, divisioncolor
+  LabelPad  2, {1/16}
+  ColorPad 2, divisioncolor
+  LabelPad  3, {1/32}
+  ColorPad 3, divisioncolor
+  LabelPad  4, {Triplets}
+  ColorPad 4, tripletcolor
+
+  LabelPad  8, {Up}
+  ColorPad 8, modecolor
+  LabelPad  9, {Down}
+  ColorPad 9, modecolor
+  LabelPad 10, {Up/Down}
+  ColorPad 10, modecolor
+  LabelPad 11, {Order}
+  ColorPad 11, modecolor
+  LabelPad 12, {Random}
+  ColorPad 12, modecolor
+
+  LabelPad 14, {Latch}
+  ColorPad 14, utilitycolor
+  LabelPad 15, {Fixed      Velocity}
+  ColorPad 15, utilitycolor
+
+  SetKnobValue 0, swing / 100.0 * 127.0
+  Call @UpdateSwingValue
+  SetKnobValue 1, gate / 100.0 * 127.0
+  Call @UpdateGateValue
+  SetKnobValue 2, (octave - 1) / 3.0 * 127.0
+  Call @UpdateOctaveValue
+  SetKnobValue 3, probability / 100.0 * 127.0
+  Call @UpdateProbabilityValue
+
+  LatchPad 0, YES
+  LatchPad 8, YES
+@End
+
+@InitArp
+  octindex = 0
+  noteindex = 0
+  numnotes = 0
+  step = 1
+
+  FillArray notes, -1, maxnotes
+  FillArray notesOrd, -1, maxnotes
+  FillArray noteVelocity, 0, 128
+  FillArray keyPressed, NO, 128
+@End
+
+@DebugNoteList
+  if debug
+    Log { ==== }
+    Log {NumNotes: }, numnotes
+    Log {Notes }, notes[0], { }, notes[1], { }, notes[2], { }, notes[3], { }, notes[4], { }, notes[5], { }, notes[6], { }, notes[7]
+    Log {OrderedNotes }, notesOrd[0], { }, notesOrd[1], { }, notesOrd[2], { }, notesOrd[3], { }, notesOrd[4], { }, notesOrd[5], { }, notesOrd[6], { }, notesOrd[7]
+  endif
+@End
+
+@DebugArpNote
+  if debug
+    Log {Note }, note, { Velocity }, velo, { Notelen }, notelen
+  endif
+@End
