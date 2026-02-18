@@ -1,11 +1,16 @@
-// Arpeggiator
+// A simple arpeggiator
+//
+// Author: os68ng
+// Version: 0.2
 
 @Description
-A simple Arpeggiator
+A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.
+
+Press SHIFT for setting the MIDI channel and a fixed velocity.
 @End
 
 @OnLoad
-  debug = YES
+  debug = NO
   maxnotes = 8
   ShowLayout 2
   SetShortName {Arpeggiator}
@@ -21,6 +26,9 @@ A simple Arpeggiator
     notes[numnotes] = MIDINote
     numnotes = numnotes + 1
     noteVelocity[MIDINote] = MIDIVelocity
+    if not beatsync and numnotes = 1
+      firstnoteoffset = CurrentMetroPulse + 1
+    endif
   endif
   Call @CreateOrderedNoteList
   Call @DebugNoteList
@@ -40,10 +48,10 @@ A simple Arpeggiator
       if notes[n] = note
         notes[n] = -1
         numnotes = numnotes - 1
-        if noteindex > numnotes
-          noteindex = numnotes
-        endif
         noteVelocity[note] = 0
+        if numnotes = 0
+          Call @ResetArp
+        endif
         Call @CompressNoteList
         Call @CreateOrderedNoteList
         Call @DebugNoteList
@@ -53,16 +61,29 @@ A simple Arpeggiator
   endif
 @End
 
+// forwards any events that are not note on or off
 @OnMidiInput
   if MIDICommand <> 0x80 AND MIDICommand <> 0x90
     SendMIDIOut (MIDICommand + MIDIChannel),MIDIByte2,MIDIByte3
   endif
 @End
 
+// The heart
 @OnMetroPulse
+  if triplets
+    if (CurrentMetroPulse - firstnoteoffset) % (ppqdiv * 2 / 3) <> 0
+      Exit
+    endif
+  elseif (CurrentMetroPulse - firstnoteoffset) % ppqdiv <> 0
+    Exit
+  endif
   FlashUserLed
+  Call @HandleArp
+@End
+
+@HandleArp
   if HostTempo > 0
-    notelen = (60.0 / HostTempo) / (Pow 2, (division)) * 1000.0 * gate / 100.0
+    notelen = (60.0 / HostTempo) / ((Pow 2, (division))) * 1000.0 * gate / 100.0
     if triplets
       notelen = notelen * (2.0 / 3.0)
     endif
@@ -82,8 +103,19 @@ A simple Arpeggiator
   endif
 @End
 
+// Arp up handler
 @ArpUp
+  // handle margins first
+  if noteindex > numnotes - 1
+    noteindex = 0
+    octindex = octindex + 1
+    if octindex > octave - 1
+      octindex = 0
+    endif
+  endif
+
   note = notesOrd[noteindex]
+
   Call @GetVelocity
   note = note + (octindex * 12)
   if note > 127
@@ -96,17 +128,21 @@ A simple Arpeggiator
   SendMidiNoteOn midich, note, velo
   SendMidiNoteOff midich, note, 0, notelen
   noteindex = noteindex + 1
-  if noteindex >= numnotes
-    noteindex = 0
-    octindex = octindex + 1
-    if octindex > octave - 1
-      octindex = 0
-    endif
-  endif
 @End
 
+// Arp down handler
 @ArpDown
+  // handle margins first
+  if noteindex < 0
+    noteindex = numnotes - 1
+    octindex = octindex - 1
+    if octindex < 0
+      octindex = octave - 1
+    endif
+  endif
+
   note = notesOrd[noteindex]
+
   Call @GetVelocity
   note = note + (octindex * 12)
   if note < 0 or note > 127
@@ -119,30 +155,12 @@ A simple Arpeggiator
   SendMidiNoteOn midich, note, velo
   SendMidiNoteOff midich, note, 0, notelen
   noteindex = noteindex - 1
-  if noteindex < 0
-    noteindex = numnotes - 1
-    octindex = octindex - 1
-    if octindex < 0
-      octindex = octave - 1
-    endif
-  endif
 @End
 
+// Arp up/down handler
 @ArpUpDown
-  note = notesOrd[noteindex]
-  Call @GetVelocity
-  note = note + (octindex * 12)
-  if note < 0 or note > 127
-    Exit
-  endif
-  if (Random 0, 100) > probability
-    Exit
-  endif
-  Call @DebugArpNote
-  SendMidiNoteOn midich, note, velo
-  SendMidiNoteOff midich, note, 0, notelen
-  noteindex = noteindex + step
-  if noteindex >= numnotes
+  // handle margins first
+  if noteindex > numnotes - 1
     octindex = octindex + step
     if octindex > octave - 1
       octindex = octave - 1
@@ -162,10 +180,36 @@ A simple Arpeggiator
       noteindex = numnotes - 1
     endif
   endif
+
+  note = notesOrd[noteindex]
+
+  Call @GetVelocity
+  note = note + (octindex * 12)
+  if note < 0 or note > 127
+    Exit
+  endif
+  if (Random 0, 100) > probability
+    Exit
+  endif
+  Call @DebugArpNote
+  SendMidiNoteOn midich, note, velo
+  SendMidiNoteOff midich, note, 0, notelen
+  noteindex = noteindex + step
 @End
 
+// Arp by order handler
 @ArpOrder
+  // handle margins first
+  if noteindex > numnotes - 1
+    octindex = octindex + 1
+    if octindex > octave - 1
+      octindex = 0
+    endif
+    noteindex = 0
+  endif
+
   note = notes[noteindex]
+
   Call @GetVelocity
   note = note + (octindex * 12)
   if note > 127
@@ -178,15 +222,9 @@ A simple Arpeggiator
   SendMidiNoteOn midich, note, velo
   SendMidiNoteOff midich, note, 0, notelen
   noteindex = noteindex + 1
-  if noteindex >= numnotes
-    octindex = octindex + 1
-    if octindex > octave - 1
-      octindex = 0
-    endif
-    noteindex = 0
-  endif
 @End
 
+// Arp random handler
 @ArpRandom
   nidx = Random 0, numnotes - 1
   oidx = Random 0, octave - 1
@@ -204,33 +242,38 @@ A simple Arpeggiator
   SendMidiNoteOff midich, note, 0, notelen
 @End
 
+// handles fixed velocity
 @GetVelocity
   if fixedVelo
-    velo = 120
+    velo = fixedveloval
   else
     velo = noteVelocity[note]
   endif
 @End
 
+// ensure all notes off, espacially in latch mode
 @AllNotesOff
   newnumnotes = numnotes
-  for n = 0 to (numnotes - 1)
-    note = notes[n]
-    if not keyPressed[note]
-      notes[n] = -1
-      noteVelocity[note] = 0
-      newnumnotes = newnumnotes - 1
+  if numnotes > 0
+    for n = 0 to (numnotes - 1)
+      note = notes[n]
+      if not keyPressed[note]
+        notes[n] = -1
+        noteVelocity[note] = 0
+        newnumnotes = newnumnotes - 1
+      endif
+    endfor
+    numnotes = newnumnotes
+    if noteindex > numnotes
+      noteindex = numnotes
     endif
-  endfor
-  numnotes = newnumnotes
-  if noteindex > numnotes
-    noteindex = numnotes
+    Call @CompressNoteList
+    Call @CreateOrderedNoteList
   endif
-  Call @CompressNoteList
-  Call @CreateOrderedNoteList
   Call @DebugNoteList
 @End
 
+// remove empty note entries
 @CompressNoteList
   FillArray newnotes, -1, maxnotes
   nn = 0
@@ -243,8 +286,9 @@ A simple Arpeggiator
   CopyArray newnotes, notes, 8
 @End
 
+// create an ordered list of notes
 @CreateOrderedNoteList
-  //FillArray notesOrd, -1, maxnotes
+  FillArray notesOrd, -1, maxnotes
   if numnotes > 0
     for n = 0 to numnotes - 1
       gcount = 0
@@ -258,57 +302,99 @@ A simple Arpeggiator
   endif
 @End
 
+@OnShiftDown
+  Call @UpdateKnobValues
+@End
+
+@OnShiftUp
+  Call @UpdateKnobValues
+@End
+
 @OnPadDown
   pad = LastPad
   if pad >= 0 and pad <= 3
     Call @SetDivision
   elseif pad = 4
-    Call @SetTriplets
+    Call @ToggleTriplets
+  elseif pad = 7
+    Call @ToggleBeatSync
   elseif pad >= 8 and pad <= 12
     Call @SetMode
   elseif pad = 14
-    Call @SetLatch
+    Call @ToggleLatch
   elseif pad = 15
-    Call @SetFixedVelocity
+    Call @ToggleFixedVelocity
+  elseif debug and pad = 6
+    Call @DebugVars
   endif
 @End
 
 @OnKnobChange
   knob = LastKnob
-  if knob = 0
-    Call @SetSwing
-  elseif knob = 1
-    Call @SetGate
-  elseif knob = 2
-    Call @SetOctave
-  elseif knob = 3
-    Call @SetProbability
+  if ShiftPressed
+    if knob = 0
+      Call @SetMidiCh
+    elseif knob = 1
+      Call @SetFixedVeloValue
+    endif
+  else
+    if knob = 0
+      Call @SetSwing
+    elseif knob = 1
+      Call @SetGate
+    elseif knob = 2
+      Call @SetOctave
+    elseif knob = 3
+      Call @SetProbability
+    endif
   endif
 @End
 
 @SetDivision
   lastdiv = division
   division = LastPad
-  LatchPad 0 + lastdiv, NO
-  LatchPad LastPad, YES
-  // TODO triplets
-  SetMetroPPQN (Pow 2, division)
+  for d = 0 to 3
+    if d = division
+      LatchPad d, YES
+    else
+      Latchpad d, NO
+    endif
+  endfor
+
+  Call @UpdateMetroPPQN
 @End
 
-@SetTriplets
-  if triplets = NO
-    triplets = YES
-  else
-    triplets = NO
-  endif
+@ToggleTriplets
+  triplets = not triplets
   LatchPad 4, triplets
+@End
+
+@ToggleBeatSync
+  beatsync = not beatsync
+  if beatsync
+    ppqdiv = 3
+  else
+    ppqdiv = 3 * 12
+  endif
+  firstnoteoffset = 0
+  LatchPad 7, beatsync
+  Call @UpdateMetroPPQN
 @End
 
 @SetMode
   lastmode = mode
   mode = LastPad - 8
-  LatchPad 8 + lastmode, NO
-  LatchPad LastPad, YES
+  for m = 0 to 4
+    if m = mode
+      LatchPad 8 + m, YES
+    else
+      Latchpad 8 + m, NO
+    endif
+  endfor
+  Call @ResetArp
+@End
+
+@ResetArp
   if mode = 1
     step = -1
     noteindex = numnotes - 1
@@ -316,26 +402,21 @@ A simple Arpeggiator
   else
     step = 1
     noteindex = 0
+    octindex = 0
   endif
-  octindex = 0
+  firstnoteoffset = 0
 @End
 
-@SetLatch
-  if latch = NO
-    latch = YES
-  else
-    latch = NO
+@ToggleLatch
+  latch = not latch
+  if not latch
     Call @AllNotesOff
   endif
   LatchPad 14, latch
 @End
 
-@SetFixedVelocity
-  if fixedvelo = NO
-    fixedvelo = YES
-  else
-    fixedvelo = NO
-  endif
+@ToggleFixedVelocity
+  fixedvelo = not fixedvelo
   LatchPad 15, fixedvelo
 @End
 
@@ -343,6 +424,10 @@ A simple Arpeggiator
   knobval = GetKnobValue 0
   swing = Round (knobval / 127.0 * 100)
   Call @UpdateSwingValue 
+@End
+
+@UpdateMetroPPQN
+  SetMetroPPQN (Pow 2, division) * ppqdiv
 @End
 
 @UpdateSwingValue
@@ -380,24 +465,71 @@ A simple Arpeggiator
   LabelKnob 3, {Prob }, probability, {%}
 @End
 
+@SetMidiCh
+  knobval = GetKnobValue 0
+  midich = Round (knobval / 127.0 * 15.0)
+  Call @UpdateMidiChValue
+@End
+
+@UpdateMidiChValue
+  LabelKnob 0, {MidiCh }, midich+1
+@End
+
+@SetFixedVeloValue
+  knobval = GetKnobValue 1
+  fixedveloval = Round(knobval)
+  Call @UpdateFixedVeloValue
+@End
+
+@UpdateFixedVeloValue
+  LabelKnob 1, {FixVelo }, fixedveloval
+@End
+
+@UpdateKnobValues
+  if ShiftPressed
+    SetKnobValue 0, midich / 15.0 * 127.0
+    Call @UpdateMidiChValue
+    SetKnobValue 1, fixedveloval
+    Call @UpdateFixedVeloValue
+    LabelKnob 2, { }
+    LabelKnob 3, { }
+  else
+    SetKnobValue 0, swing / 100.0 * 127.0
+    Call @UpdateSwingValue
+    SetKnobValue 1, gate / 100.0 * 127.0
+    Call @UpdateGateValue
+    SetKnobValue 2, (octave - 1) / 3.0 * 127.0
+    Call @UpdateOctaveValue
+    SetKnobValue 3, probability / 100.0 * 127.0
+    Call @UpdateProbabilityValue
+  endif
+@End
+
 // ====================================
 
 @Init
-  swing = 0
-  gate = 50
-  octave = 1
-  probability = 100
+  // only initialize on first load
+  if Unassigned arpinit
+    arpinit = YES
 
-  division = 0
-  triplets = NO
-  mode = 0
-  latch = NO
-  fixedvelo = NO
+    swing = 0
+    gate = 50
+    octave = 1
+    probability = 100
+  
+    division = 0
+    triplets = NO
+    beatsync = YES
 
-  midich = 0
+    mode = 0
+    latch = NO
+    fixedvelo = NO
+  
+    midich = 0
+    fixedveloval = 100
+  endif
 
-  // TODO triplets
-  SetMetroPPQN (Pow 2, division)
+  ppqdiv = 3
 
   Call @InitUI
   Call @InitArp
@@ -409,6 +541,8 @@ A simple Arpeggiator
   modecolor = 6
   utilitycolor = 2
 
+  LabelPads {Arpeggiator}
+  
   LabelPad  0, {1/4}
   ColorPad 0, divisioncolor
   LabelPad  1, {1/8}
@@ -420,6 +554,13 @@ A simple Arpeggiator
   LabelPad  4, {Triplets}
   ColorPad 4, tripletcolor
 
+  if debug
+    LabelPad 6, {Debug}
+  endif
+
+  LabelPad 7, {BeatSync}
+  ColorPad 7, utilitycolor
+  
   LabelPad  8, {Up}
   ColorPad 8, modecolor
   LabelPad  9, {Down}
@@ -436,6 +577,7 @@ A simple Arpeggiator
   LabelPad 15, {Fixed      Velocity}
   ColorPad 15, utilitycolor
 
+  LabelKnobs { }
   SetKnobValue 0, swing / 100.0 * 127.0
   Call @UpdateSwingValue
   SetKnobValue 1, gate / 100.0 * 127.0
@@ -445,8 +587,11 @@ A simple Arpeggiator
   SetKnobValue 3, probability / 100.0 * 127.0
   Call @UpdateProbabilityValue
 
-  LatchPad 0, YES
-  LatchPad 8, YES
+  LatchPad division, YES
+  LatchPad 8 + mode, YES
+  LatchPad 7, beatsync
+  LatchPad 14, latch
+  LatchPad 15, fixedvelo
 @End
 
 @InitArp
@@ -454,17 +599,19 @@ A simple Arpeggiator
   noteindex = 0
   numnotes = 0
   step = 1
+  firstnoteoffset = 0
 
   FillArray notes, -1, maxnotes
   FillArray notesOrd, -1, maxnotes
   FillArray noteVelocity, 0, 128
   FillArray keyPressed, NO, 128
+
+  Call @UpdateMetroPPQN
 @End
 
 @DebugNoteList
   if debug
-    Log { ==== }
-    Log {NumNotes: }, numnotes
+    Log {NumNotes: }, numnotes, { NoteIndex: }, noteindex, { First note offset: }, firstnoteoffset
     Log {Notes }, notes[0], { }, notes[1], { }, notes[2], { }, notes[3], { }, notes[4], { }, notes[5], { }, notes[6], { }, notes[7]
     Log {OrderedNotes }, notesOrd[0], { }, notesOrd[1], { }, notesOrd[2], { }, notesOrd[3], { }, notesOrd[4], { }, notesOrd[5], { }, notesOrd[6], { }, notesOrd[7]
   endif
@@ -472,6 +619,18 @@ A simple Arpeggiator
 
 @DebugArpNote
   if debug
-    Log {Note }, note, { Velocity }, velo, { Notelen }, notelen
+    Log {Arp Index }, noteindex, { Note }, note, { Velocity }, velo, { Notelen }, notelen
   endif
+@End
+
+@DebugVars
+  Call @DebugNoteList
+  Log {Division: }, division
+  Log {Triplets: }, triplets
+  Log {BeatSync: }, beatsync
+  Log {Mode: }, mode
+  Log {Latch: }, latch
+  Log {FixedVel: }, fixedvelo
+
+  Log {Octave: }, octave
 @End
