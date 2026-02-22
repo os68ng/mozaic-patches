@@ -2,11 +2,14 @@
 //
 // Author: os68ng
 // Version: 0.2
+// Licence: Do What The F*ck You Want To Public License
+//
+// A simple arpeggiator
 
 @Description
 A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.
 
-Press SHIFT for setting the MIDI channel and a fixed velocity.
+Press SHIFT to set the MIDI channel and a fixed velocity value.
 @End
 
 @OnLoad
@@ -81,6 +84,7 @@ Press SHIFT for setting the MIDI channel and a fixed velocity.
   Call @HandleArp
 @End
 
+// The arp dispatcher
 @HandleArp
   if HostTempo > 0
     notelen = (60.0 / HostTempo) / ((Pow 2, (division))) * 1000.0 * gate / 100.0
