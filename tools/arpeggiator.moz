@@ -1,7 +1,7 @@
 // A simple arpeggiator
 //
 // Author: os68ng
-// Version: 0.2
+// Version: 1.0
 // Licence: Do What The F*ck You Want To Public License
 //
 // A simple arpeggiator
@@ -9,7 +9,15 @@
 @Description
 A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.
 
-Press SHIFT to set the MIDI channel and a fixed velocity value.
+Some hints:
+- To play off beat switch off "BeatSync".
+- Press SHIFT to set the MIDI channel and a fixed velocity value.
+- Latch mode also supports a key toggle mode (press SHIFT to switch it on/off)
+
+Play around with probability, swing to get crazy results. With latch toggle mode
+you also get some sort of simple live sequencer.
+
+Have fun!
 @End
 
 @OnLoad
@@ -21,11 +29,19 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
 @End
 
 @OnMidiNoteOn
-  keyPressed[MIDINote] = YES
-  if latch and noteVelocity[MIDINote] > 0
-    note = MIDINote
-    Call @NoteOff
-  elseif numnotes < maxnotes
+  if latch
+    if latchtoggle
+      if noteVelocity[MIDINote] > 0
+        note = MIDINote
+        Call @NoteOff
+        Exit
+      endif
+    elseif numKeysPressed = 0
+      Call @AllNotesOff
+    endif
+  endif
+  Inc numKeysPressed
+  if numnotes < maxnotes
     notes[numnotes] = MIDINote
     numnotes = numnotes + 1
     noteVelocity[MIDINote] = MIDIVelocity
@@ -38,7 +54,7 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
 @End
 
 @OnMidiNoteOff
-  keyPressed[MIDINote] = NO
+  Dec numKeysPressed, 0
   if not latch
     note = MIDINote
     Call @NoteOff
@@ -80,9 +96,13 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   elseif (CurrentMetroPulse - firstnoteoffset) % ppqdiv <> 0
     Exit
   endif
-  FlashUserLed
+  //FlashUserLed
   Call @HandleArp
 @End
+
+// ====================================
+// Arp handler
+// ====================================
 
 // The arp dispatcher
 @HandleArp
@@ -169,7 +189,7 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
     if octindex > octave - 1
       octindex = octave - 1
       step = -1
-      noteindex = numnotes - 1
+      noteindex = numnotes - 2
     else
       noteindex = 0
     endif
@@ -179,7 +199,11 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
     if octindex < 0
       octindex = 0
       step = 1
-      noteindex = 0
+      if numnotes > 1
+        noteindex = 1
+      else
+        noteindex = 0
+      endif
     else
       noteindex = numnotes - 1
     endif
@@ -246,6 +270,10 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   SendMidiNoteOff midich, note, 0, notelen
 @End
 
+// ====================================
+// Utility stuff
+// ====================================
+
 // handles fixed velocity
 @GetVelocity
   if fixedVelo
@@ -261,11 +289,9 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   if numnotes > 0
     for n = 0 to (numnotes - 1)
       note = notes[n]
-      if not keyPressed[note]
-        notes[n] = -1
-        noteVelocity[note] = 0
-        newnumnotes = newnumnotes - 1
-      endif
+      notes[n] = -1
+      noteVelocity[note] = 0
+      newnumnotes = newnumnotes - 1
     endfor
     numnotes = newnumnotes
     if noteindex > numnotes
@@ -306,12 +332,18 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   endif
 @End
 
+// ====================================
+// UI stuff
+// ====================================
+
 @OnShiftDown
   Call @UpdateKnobValues
+  Call @UpdatePadLabels
 @End
 
 @OnShiftUp
   Call @UpdateKnobValues
+  Call @UpdatePadLabels
 @End
 
 @OnPadDown
@@ -325,7 +357,11 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   elseif pad >= 8 and pad <= 12
     Call @SetMode
   elseif pad = 14
-    Call @ToggleLatch
+    if ShiftPressed
+      Call @ToggleLatchToggle
+    else
+      Call @ToggleLatch
+    endif
   elseif pad = 15
     Call @ToggleFixedVelocity
   elseif debug and pad = 6
@@ -419,6 +455,11 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   LatchPad 14, latch
 @End
 
+@ToggleLatchToggle
+  latchtoggle = not latchtoggle
+  LatchPad 14, latchtoggle
+@End
+
 @ToggleFixedVelocity
   fixedvelo = not fixedvelo
   LatchPad 15, fixedvelo
@@ -509,8 +550,19 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   endif
 @End
 
-// ====================================
+@UpdatePadLabels
+  if ShiftPressed
+    LabelPad 14, {Toggle Mode}
+    LatchPad 14, latchtoggle
+  else
+    LabelPad 14, {Latch}
+    LatchPad 14, latch
+  endif
+@End
 
+// ====================================
+// Init stuff
+// ====================================
 @Init
   // only initialize on first load
   if Unassigned arpinit
@@ -521,12 +573,13 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
     octave = 1
     probability = 100
   
-    division = 0
+    division = 1 // default 1/8
     triplets = NO
     beatsync = YES
 
     mode = 0
     latch = NO
+    latchtoggle = NO
     fixedvelo = NO
   
     midich = 0
@@ -604,11 +657,11 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   numnotes = 0
   step = 1
   firstnoteoffset = 0
+  numKeysPressed = 0
 
   FillArray notes, -1, maxnotes
   FillArray notesOrd, -1, maxnotes
   FillArray noteVelocity, 0, 128
-  FillArray keyPressed, NO, 128
 
   Call @UpdateMetroPPQN
 @End
@@ -637,4 +690,6 @@ Press SHIFT to set the MIDI channel and a fixed velocity value.
   Log {FixedVel: }, fixedvelo
 
   Log {Octave: }, octave
+
+  Log {NumKeysPressed: }, numKeysPressed
 @End
