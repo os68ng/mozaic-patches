@@ -59,6 +59,7 @@ Also gives you a visible feedback.
 
 @Init
   if Unassigned modinit
+    modinit = YES
     ctchan = 9
     ctbarnote = 60
     ctbarvel = 100
