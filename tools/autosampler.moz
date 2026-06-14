@@ -1,0 +1,299 @@
+// Auto Sampler
+//
+// Author: os68ng
+// Version: 0.1
+// Licence: Do What The F*ck You Want To Public License
+//
+// An extension to suppport auto sampling in apps (e.g. BM3).
+
+@Description
+An extension to suppport auto sampling in apps (e.g. as a AU in BM3) or even outside (standalone).
+
+Have fun!
+@End
+
+@OnLoad
+  debug = NO
+  ShowLayout 0
+  SetShortName {Auto Sampler}
+  Call @Init
+@End
+
+@ResetSampler
+  current_note = lokey
+  current_vel = 0
+  current_time = 0
+@End
+
+@StartSampler
+  Call @ResetSampler
+  LatchPad 0, YES
+  LabelPad 0, {Stop}
+  ColorPad 0, 3
+  ColorPad 2, 1
+  SetTimerInterval gate+release+pause
+  StartTimer
+  Call @TriggerNote
+@End
+
+@StopSampler
+  StopTimer
+  SendMIDINoteOff midich, current_note, 0
+  LatchPad 0, NO
+  LabelPad 0, {Start}
+  ColorPad 0, 0
+  LabelPad 2, {Ready}
+  ColorPad 2, 3
+@End
+
+@TriggerNote
+  if debug
+    Log {Trigger note }, (NoteName current_note,YES), { Velocity: }, velos[current_vel], { Gate: }, gate, {ms Release: }, release, {ms.}
+  endif
+  LabelPad 2, {Note: }, (NoteName current_note,YES), { Velocity: }, velos[current_vel]
+  SendMIDINoteOn midich, current_note, velos[current_vel]
+  SendMIDINoteOff midich, current_note, 0, gate
+@End
+
+@DetermineNextVel
+  // find next velocity layer
+  while current_vel < 3
+    Inc current_vel
+    if velos[current_vel] > 0
+      Exit
+    endif
+  endwhile
+  // no more velocity layers found
+  current_vel = 0
+@End
+
+@OnPadDown
+  pad = LastPad
+  if pad = 0
+    newpadval = NOT PadState 0
+    LatchPad 0, newpadval
+    if newpadval = YES
+      Call @StartSampler
+    else
+      Call @StopSampler
+    endif
+  elseif pad = 1
+    keytrig = NOT PadState 1
+    LatchPad 1, keytrig
+  endif
+@End
+
+@OnMidiInput
+  if NOT sstate
+    // start on key trigger
+    if keytrig
+      if MIDICommand = 0x80 // Note on
+        Call @StartSampler
+      endif
+    else
+      // only thru if not sampling
+      SendMIDIThru
+    endif
+  endif
+@End
+
+@OnTimer
+  ResetTimer
+  current_note = current_note + interval
+  if current_note > hikey
+    Call @DetermineNextVel
+    if current_vel = 0
+      Call @StopSampler
+      Exit
+    else
+      current_note = lokey
+    endif
+  endif
+  if current_note < hikey
+    Call @TriggerNote
+  endif
+@End
+
+// ====================================
+// UI stuff
+// ====================================
+
+@OnKnobChange
+  knob = LastKnob
+  if knob = 0 // start note
+    Call @SetStartNote
+    Call @LabelStartNote
+  elseif knob = 1 // end note
+    Call @SetEndNote
+    Call @LabelEndNote
+  elseif knob = 2 // interval
+    Call @SetInterval
+    Call @LabelInterval
+  elseif knob = 3 // gate
+    Call @SetGate
+    Call @LabelGate
+  elseif knob = 4 // release
+    Call @SetRelease
+    Call @LabelRelease
+  elseif knob >= 5 and knob <= 8
+    Call @SetVelos
+    Call @LabelVelos
+  elseif knob = 9
+    Call @SetMidiCh
+    Call @LabelMidiCh
+  endif
+  Call @UpdateInfo
+@End
+
+@UpdateInfo
+  vels = 0
+  for v = 0 to velos
+    if velos[v] > 0
+      Inc vels
+    endif
+  endfor
+  keys = RoundUp((hikey - lokey) / interval)
+  splits = keys * vels
+  LabelPad 3,{Keys: }, keys, {     }, { Vels: }, vels, {     }, { Splits: }, splits, {     }, { Time: }, (Round((splits*(gate+release+pause))/1000)), {s}
+@End
+
+@SetStartNote
+  lokey = GetKnobValue 0
+  if lokey > hikey
+    lokey = hikey
+    SetKnobValue 0, lokey
+  endif
+@End
+
+@SetEndNote
+  hikey = GetKnobValue 1
+  if hikey < lokey
+    hikey = lokey
+    SetKnobValue 1, hikey
+  endif
+@End
+
+@SetInterval
+  val = GetKnobValue 2
+  interval = Round(val / 127.0 * 12.0)
+  if interval = 0
+    interval = 1
+  endif
+@End
+
+@SetGate
+  val = GetKnobValue 3
+  gate = Round(val / 127.0 * MAX_GATE)
+@End
+
+@SetRelease
+  val = GetKnobValue 4
+  release = Round(val / 127.0 * MAX_RELEASE)
+@End
+
+@SetVelos
+  knob = LastKnob
+  velos[knob-5] = Round(GetKnobValue knob)
+@End
+
+@SetMidiCh
+  val = GetKnobValue 9
+  midich = Round(val / 127.0 * 15)
+@End
+
+@LabelStartNote
+  LabelKnob 0, {Start: }, NoteName lokey, YES
+@End
+
+@LabelEndNote
+  LabelKnob 1, {End: }, NoteName hikey, YES
+@End
+
+@LabelInterval
+  LabelKnob 2, interval, { ST}
+@End
+
+@LabelGate
+  LabelKnob 3, {G:}, gate, {ms}
+@End
+
+@LabelRelease
+  LabelKnob 4, {R:}, release, {ms}
+@End
+
+@LabelVelos
+  for v = 0 to 3
+    LabelKnob 5+v, {V}, v+1, {: }, velos[v]
+  endfor
+@End
+
+@LabelMidiCh
+  LabelKnob 9, {Ch: }, midich+1
+@End
+
+// ====================================
+// Init stuff
+// ====================================
+@Init
+  MAX_GATE = 5000.0
+  MAX_RELEASE = 10000.0
+  TIMER_RESOLUTION = 10
+
+  // only initialize on first load
+  if Unassigned modinit
+    modinit = YES
+
+    lokey = 36 // C1
+    hikey = 95 // B5
+    interval = 12
+    gate = 1000 // ms
+    release = 2000 // ms
+    pause = 500 // ms
+    velos = [120, 0, 0, 0]
+
+    midich = 0
+
+    sstate = NO // off
+    keytrig = NO // off
+  endif
+
+  Call @InitUI
+@End
+
+@InitUI
+  LabelPads {Control}
+
+  LabelPad 0, {Start}
+  ColorPad 0, 0
+
+  LabelPad 1, {KeyTrig}
+  ColorPad 1, 6
+
+  LabelPad 2, {Ready}
+  ColorPad 2, 3
+  LabelKnobs {Configuration}
+
+  SetKnobValue 0, lokey
+  SetKnobValue 1, hikey
+  SetKnobValue 2, interval / 12.0 * 127.0
+  SetKnobValue 3, gate / MAX_GATE * 127.0
+  SetKnobValue 4, release / MAX_RELEASE * 127.0
+
+  for v = 0 to 3
+    SetKnobValue 5+v,velos[v]
+  endfor
+
+  SetKnobValue 9, midich / 16.0 * 127.0
+
+  Call @LabelStartNote
+  Call @LabelEndNote
+  Call @LabelInterval
+  Call @LabelGate
+  Call @LabelRelease
+  Call @LabelVelos
+  Call @LabelMidiCh
+
+  LabelXY { }
+
+  Call @UpdateInfo
+@End
