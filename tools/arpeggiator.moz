@@ -1,13 +1,14 @@
 // A simple arpeggiator
 //
 // Author: os68ng
-// Version: 1.0
+// Version: 1.1
 // Licence: Do What The F*ck You Want To Public License
 //
 // A simple arpeggiator
 
 @Description
 A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.
+The host must be running (play mode).
 
 Some hints:
 - To play off beat switch off "BeatSync".
@@ -23,7 +24,6 @@ Have fun!
 @OnLoad
   debug = NO
   maxnotes = 8
-  ShowLayout 2
   SetShortName {Arpeggiator}
   Call @Init
 @End
@@ -82,22 +82,24 @@ Have fun!
 
 // forwards any events that are not note on or off
 @OnMidiInput
-  if MIDICommand <> 0x80 AND MIDICommand <> 0x90
+  if (MIDICommand <> 0x80 AND MIDICommand <> 0x90) or not arpon
     SendMIDIOut (MIDICommand + MIDIChannel),MIDIByte2,MIDIByte3
   endif
 @End
 
 // The heart
 @OnMetroPulse
-  if triplets
-    if (CurrentMetroPulse - firstnoteoffset) % (ppqdiv * 2 / 3) <> 0
+  if arpon
+    if triplets
+      if (CurrentMetroPulse - firstnoteoffset) % (ppqdiv * 2 / 3) <> 0
+        Exit
+      endif
+    elseif (CurrentMetroPulse - firstnoteoffset) % ppqdiv <> 0
       Exit
     endif
-  elseif (CurrentMetroPulse - firstnoteoffset) % ppqdiv <> 0
-    Exit
+    //FlashUserLed
+    Call @HandleArp
   endif
-  //FlashUserLed
-  Call @HandleArp
 @End
 
 // ====================================
@@ -352,6 +354,8 @@ Have fun!
     Call @SetDivision
   elseif pad = 4
     Call @ToggleTriplets
+  elseif pad = 6
+    Call @ToggleArp
   elseif pad = 7
     Call @ToggleBeatSync
   elseif pad >= 8 and pad <= 12
@@ -364,7 +368,7 @@ Have fun!
     endif
   elseif pad = 15
     Call @ToggleFixedVelocity
-  elseif debug and pad = 6
+  elseif debug and pad = 13
     Call @DebugVars
   endif
 @End
@@ -445,6 +449,14 @@ Have fun!
     octindex = 0
   endif
   firstnoteoffset = 0
+@End
+
+@ToggleArp
+  arpon = not arpon
+  if not arpon
+    Call @AllNotesOff
+  endif
+  LatchPad 6, arpon
 @End
 
 @ToggleLatch
@@ -568,6 +580,8 @@ Have fun!
   if Unassigned arpinit
     arpinit = YES
 
+    arpon = YES
+
     swing = 0
     gate = 50
     octave = 1
@@ -593,6 +607,8 @@ Have fun!
 @End
 
 @InitUI
+  ShowLayout 2
+
   divisioncolor = 4
   tripletcolor = 5
   modecolor = 6
@@ -611,9 +627,8 @@ Have fun!
   LabelPad  4, {Triplets}
   ColorPad 4, tripletcolor
 
-  if debug
-    LabelPad 6, {Debug}
-  endif
+  LabelPad 6, {On}
+  ColorPad 6, utilitycolor
 
   LabelPad 7, {BeatSync}
   ColorPad 7, utilitycolor
@@ -628,6 +643,10 @@ Have fun!
   ColorPad 11, modecolor
   LabelPad 12, {Random}
   ColorPad 12, modecolor
+
+  if debug
+    LabelPad 13, {Debug}
+  endif
 
   LabelPad 14, {Latch}
   ColorPad 14, utilitycolor
@@ -646,6 +665,7 @@ Have fun!
 
   LatchPad division, YES
   LatchPad 8 + mode, YES
+  LatchPad 6, arpon
   LatchPad 7, beatsync
   LatchPad 14, latch
   LatchPad 15, fixedvelo
