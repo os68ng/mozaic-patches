@@ -7,7 +7,7 @@
 // An extension to suppport auto sampling in apps (e.g. BM3).
 
 @Description
-An extension to suppport auto sampling of synths in apps (e.g. as an AU in BM3 or Drambo).
+An extension to support auto sampling of synths in apps (e.g. as an AU in BM3 or Drambo).
 
 By setting note range, interval and velocity layers, you get a consistent recording
 of the instrument. Post processing should be easy by splitting the recording and
