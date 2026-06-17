@@ -1,20 +1,26 @@
 // Auto Sampler
 //
 // Author: os68ng
-// Version: 0.1
+// Version: 1.0
 // Licence: Do What The F*ck You Want To Public License
 //
 // An extension to suppport auto sampling in apps (e.g. BM3).
 
 @Description
-An extension to suppport auto sampling in apps (e.g. as a AU in BM3) or even outside (standalone).
+An extension to suppport auto sampling in apps (e.g. as a AU in BM3 or Drambo).
+
+By setting note range, interval and velocity layers, you get a consitent recording
+of the instrument. Post processing should be easy by splitting the recording and
+assigning the samples to the key map.
+
+Activating "Keytrig" waits for "any key" (note) to be pressed. Helpful when you want to
+start the sampling from another page where Mozaic is not visible.
 
 Have fun!
 @End
 
 @OnLoad
   debug = NO
-  ShowLayout 0
   SetShortName {Auto Sampler}
   Call @Init
 @End
@@ -261,6 +267,7 @@ Have fun!
 @End
 
 @InitUI
+  ShowLayout 0
   LabelPads {Control}
 
   LabelPad 0, {Start}
