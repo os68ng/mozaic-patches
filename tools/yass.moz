@@ -1,0 +1,491 @@
+// YASS - Yet Another Step Sequencer
+//
+// Author: os68ng
+// Version: 1.0
+// Licence: Do What The F*ck You Want To Public License
+//
+// Yet another step sequencer with some tricks.
+
+@Description
+Yet another sequencer with some tricks inside.
+
+- Hold shift to set divisions and play direction
+- Hold step to set note, velocity, probability and substeps
+- Holding a step you can use a keyboard to set the note
+
+Substeps follow a binary pattern ;-)
+
+Have fun!
+@End
+
+@OnLoad
+  debug = NO
+  SetShortName {YASS}
+  Call @Init
+  Call @ResetSequencer
+  Call @UpdateMetroPPQN
+@End
+
+// ====================================
+// Sequencer stuff
+// ====================================
+
+@ResetSequencer
+  if seqmode = 0 or seqmode = 2 // forward or pingpong
+    step = 0
+    stepinc = 1
+  elseif seqmode = 1 // backward
+    step = steps - 1
+    stepinc = -1
+  elseif seqmode = 3 // Random
+    step = Random 0, steps-1
+    stepinc = 0
+  endif
+@End
+
+@DetermineNextStep
+  if seqmode = 0 // Forward
+    step = step + 1
+    if step >= steps
+      step = 0
+    endif
+  elseif seqmode = 1 // Backward
+    step = step - 1
+    if step < 0
+      step = steps - 1
+    endif
+  elseif seqmode = 2 // Ping Pong
+    step = step + stepinc
+    if step >= steps
+      step = steps - 1
+      stepinc = -1
+    elseif step < 0
+      step = 0
+      stepinc = 1
+    endif
+  elseif seqmode = 3 // Random
+    step = Random 0, steps-1
+  endif
+@End
+
+@OnHostStart
+  Call @ResetSequencer
+  Call @UpdateMetroPPQN
+@End
+
+@OnMetroPulse
+  if HostRunning
+    if CurrentMetroPulse % 12 = 0
+      Call @SendEvent
+      Call @DetermineNextStep
+    endif
+  endif
+@End
+
+@OnMidiNoteOn
+  if paddown >= 0 and lpad >= 0
+    notes[lpad] = MIDINote
+    pad = lpad
+    Call @LabelPadStep
+    Call @LabelNote
+    lastnote = MIDINote
+  endif
+  SendMIDIThru
+@End
+
+@SendEvent
+  FlashPad step
+  note = notes[step]
+  if note >= 0
+    vel = notevel[step]
+    prob = probabilities[step]
+    subst = substeps[step]
+    gatetime = (60.0 / HostTempo) / (steps / HostBeatsPerMeasure) * gate / 100.0
+    if (Random 0, 100) <= prob
+      if subst > 1
+        Call @GenerateSubsteps
+      else
+        if debug
+          LogTime
+          Log {Note }, note, { Vel }, vel
+        endif
+        SendMIDINoteOn midich, note, vel
+        SendMIDINoteOff midich, note, 0, gatetime
+      endif
+    endif
+  endif
+@End
+
+@GenerateSubsteps
+  substeplen = (60.0 / HostTempo) / (steps / HostBeatsPerMeasure) / 8 * 1000
+  if debug
+    LogTime
+    Log {Note }, note, { Vel }, vel, { Subst }, subst
+  endif
+  for n = 0 to 6
+    if subst & exp2n[n]
+      SendMIDINoteOn midich, note, vel, (n * substeplen)
+      SendMIDINoteOff midich, note, vel, (n * substeplen) + substeplen
+    endif
+  endfor
+@End
+
+@UpdateMetroPPQN
+  SetMetroPPQN divisions[division] * 3
+@End
+
+// ====================================
+// UI stuff
+// ====================================
+
+@OnKnobChange
+  knob = LastKnob
+  knobval = GetKnobValue knob
+  if ShiftPressed
+    if knob = knobmidich
+      Call @SetMidiCh
+      Call @LabelMidiCh
+    endif
+  elseif paddown >= 0
+    if knob = knobnote
+      Call @SetNote
+      Call @LabelNote
+    elseif knob = knobvel
+      Call @SetVelocity
+      Call @LabelVelocity
+    elseif knob = knobprob
+      Call @SetProbability
+      Call @LabelProbability
+    elseif knob = knobsubsteps
+      Call @SetSubsteps
+      Call @LabelSubsteps
+      Call @LabelPadSubsteps
+    endif
+  else
+    if knob = knobsteps
+      Call @SetSteps
+      Call @LabelSteps
+    elseif knob = knobswing
+      Call @SetSwing
+      Call @LabelSwing
+      SetMetroSwing swing
+    elseif knob = knobgate
+      Call @SetGate
+      Call @LabelGate
+    endif
+  endif
+@End
+
+@OnPadDown
+  if ShiftPressed
+    lpad = LastPad
+    if lpad >= 0 and lpad <= 7
+      division = lpad
+      Call @LabelPadsShift
+      Call @UpdateMetroPPQN
+    elseif lpad >= 8 and lpad <= 11
+      seqmode = lpad - 8
+      Call @LabelPadsShift
+    endif
+  else
+    if paddown < 0
+      lpad = LastPad
+    endif
+    paddown = LastPad
+    SetTimerInterval 200
+    StartTimer
+  endif
+@End
+
+@OnPadUp
+  if not ShiftPressed
+    paddown = -1
+    Call @LabelKnobsNormal
+    Call @LabelPadsSequence
+  endif
+@End
+
+@OnTimer
+  StopTimer
+  if paddown < 0
+    if notes[lpad] < 0
+      notes[lpad] = lastnote
+    else
+      notes[lpad] = -1
+    endif
+    pad = lpad
+    Call @LabelPadStep
+  elseif notes[lpad] >= 0
+    Call @LabelKnobsPad
+    Call @LabelPadSubsteps
+  endif
+@End
+
+@OnShiftDown
+  Call @LabelKnobsShift  
+  Call @LabelPadsShift
+@End
+
+@OnShiftUp
+  Call @LabelKnobsNormal
+  Call @LabelPadsSequence
+@End
+
+@LabelKnobsNormal
+  LabelKnobs { }
+  Call @UpdateSteps
+  Call @UpdateSwing
+  Call @UpdateGate
+  LabelKnob 3, { }
+@End
+
+@LabelKnobsPad
+  pad = paddown
+  LabelKnobs {Step }, pad
+  Call @UpdateNote
+  Call @UpdateVelocity
+  Call @UpdateProbability
+  Call @UpdateSubsteps
+@End
+
+@LabelKnobsShift
+  LabelKnobs { }
+  Call @UpdateMidiCh
+  LabelKnob 1, { }
+  LabelKnob 2, { }
+  LabelKnob 3, { }
+@End
+
+@SetSteps
+  steps = Round (knobval / 127.0 * 15.0) + 1
+@End
+
+@UpdateSteps
+  SetKnobValue knobsteps, (steps-1) / 15.0 * 127.0
+  Call @LabelSteps
+@End
+
+@LabelSteps
+  LabelKnob knobsteps, steps, { Steps}
+  Call @LabelPadsSequence
+@End
+
+@SetSwing
+  swing = Round (knobval / 127.0 * 99.0)
+@End
+
+@UpdateSwing
+  SetKnobValue knobswing, swing / 99.0 * 127.0
+  Call @LabelSwing
+@End
+
+@LabelSwing
+  LabelKnob knobswing, {Swing }, swing, {%}
+@End
+
+@SetGate
+  gate = Round (knobval / 127.0 * 100.0)
+@End
+
+@UpdateGate
+  SetKnobValue knobgate, gate / 100.0 * 127.0
+  Call @LabelGate
+@End
+
+@LabelGate
+  LabelKnob knobgate, {Gate }, gate, {%}
+@End
+
+@SetNote
+  notes[pad] = knobval
+  lastnote = knobval
+@End
+
+@UpdateNote
+  SetKnobValue knobnote, notes[pad]
+  Call @LabelNote
+@End
+
+@LabelNote
+  LabelKnob knobnote, (NoteName notes[pad], YES)
+@End
+
+@SetVelocity
+  notevel[pad] = Round knobval
+@End
+
+@UpdateVelocity
+  SetKnobValue knobvel, notevel[pad]
+  Call @LabelVelocity
+@End
+
+@LabelVelocity
+  LabelKnob knobvel, {Vel }, notevel[pad]
+@End
+
+@SetProbability
+  probabilities[pad] = Round (knobval / 127.0 * 100.0)
+@End
+
+@UpdateProbability
+  SetKnobValue knobprob, probabilities[pad] / 100.0 * 127.0
+  Call @LabelProbability
+@End
+
+@LabelProbability
+  LabelKnob knobprob, {Prob }, probabilities[pad], {%}
+@End
+
+@SetSubsteps
+  substeps[pad] = Clip ((Round knobval) + 1), 1, 127
+@End
+
+@UpdateSubsteps
+  SetKnobValue knobsubsteps, substeps[pad]
+  Call @LabelSubsteps
+@End
+
+@LabelSubsteps
+  LabelKnob knobsubsteps, {Subst }, substeps[pad]
+@End
+
+@SetMidiCh
+  midich = Round (knobval / 127.0 * 15.0)
+@End
+
+@UpdateMidiCh
+  SetKnobValue knobmidich, midich / 15.0 * 127.0
+  Call @LabelMidiCh
+@End
+
+@LabelMidiCh
+  LabelKnob knobmidich, {Ch }, (midich+1)
+@End
+
+@LabelPadsSequence
+  for pad = 0 to 15
+    Call @LabelPadStep
+  endfor
+@End
+
+@LabelPadStep
+  if pad < steps
+    ColorPad pad, 0
+    if notes[pad] >= 0
+      LabelPad pad, (NoteName notes[pad], YES)
+      //LabelPad pad, (NoteName notes[pad], YES), { Vel }, notevel[pad], { Prob }, probabilities[pad], {% Subst }, substeps[pad]
+      LatchPad pad, YES
+    else
+      LabelPad pad, { }
+      LatchPad pad, NO
+    endif
+  else
+    ColorPad pad, 1
+    LabelPad pad, { }
+    LatchPad pad, NO
+  endif
+@End
+
+@LabelPadSubsteps
+  if lpad >= 8
+    for p = 0 to 7
+      LatchPad p, NO
+      LabelPad p, { }
+    endfor
+    for s = 0 to 6
+      if substeps[lpad] & exp2n[s]
+        LatchPad 0+s, YES
+      endif
+    endfor
+  else
+    for p = 8 to 15
+      LatchPad p, NO
+      LabelPad p, { }
+    endfor
+    for s = 0 to 6
+      if substeps[lpad] & exp2n[s]
+        LatchPad 8+s, YES
+      endif
+    endfor
+  endif
+@End
+
+@LabelPadsShift
+  for p = 0 to 16
+    LatchPad p, NO
+  endfor
+  LatchPad division, YES
+  LabelPad 0, {1/4}
+  LabelPad 1, {1/4 T}
+  LabelPad 2, {1/8}
+  LabelPad 3, {1/8 T}
+  LabelPad 4, {1/16}
+  LabelPad 5, {1/16 T}
+  LabelPad 6, {1/32}
+  LabelPad 7, {1/32 T}
+
+  LatchPad (8+seqmode), YES
+  LabelPad 8, {Forward}
+  LabelPad 9, {Backward}
+  LabelPad 10, {Ping Pong}
+  LabelPad 11, {Random}
+  LabelPad 12, { }
+  LabelPad 13, { }
+  LabelPad 14, { }
+  LabelPad 15, { }
+@End
+
+// ====================================
+// Init stuff
+// ====================================
+@Init
+  // only initialize on first load
+  if Unassigned modinit
+    modinit = YES
+
+    steps = 16
+    swing = 0
+    gate = 50
+
+    seqmode = 0 // normal
+    division = 4 // 1/16
+
+    midich = 0
+
+    lastnote = 36
+    defaultvel = 127
+
+    step = 0
+
+    FillArray notes, -1, 16
+    FillArray notevel, defaultvel, 16
+    FillArray probabilities, 100, 16
+    FillArray substeps, 1, 16
+
+    divisions = [4, 6, 8, 12, 16, 24, 32, 48]
+    exp2n = [1, 2, 4, 8, 16, 32, 64]
+  endif
+  Call @InitUI
+@End
+
+@InitUI
+  ShowLayout 2
+
+  knobsteps = 0
+  knobswing = 1
+  knobgate = 2
+
+  knobnote = 0
+  knobvel = 1
+  knobprob = 2
+  knobsubsteps = 3
+
+  knobmidich = 0
+  
+  paddown = -1
+
+  LabelPads {YASS - Yet Another Step Sequencer}
+  Call @LabelKnobsNormal
+  Call @LabelPadsSequence
+@End
+
