@@ -10,6 +10,7 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | nts1.moz          | Controller for Korg NTS-1       |
 | volca_bass.moz    | Controller for Korg Volca Bass  |
 | volca_beats.moz   | Controller for Korg Volca Beats |
+| volca_drum.moz    | Controller for Korg Volca Drum  |
 | volca_fm.moz      | Controller for Korg Volca FM    |
 | volca_keys.moz    | Controller for Korg Volca Keys  |
 | volca_kick.moz    | Controller for Korg Volca Kick  |
@@ -24,3 +25,5 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | ----- | ----- |
 | midi_clicktrack.moz | Clicktrack for MIDI only / DAWless setups without having a metronome in a DAW. |
 | midi_router.moz     | A simple switch panel / router to map incoming MIDI to a destination channel.  |
+| arpeggiator.moz     | A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.  |
+| autosampler.moz     | An extension to support auto sampling of synths in apps |
