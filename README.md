@@ -27,3 +27,4 @@ Patches for Mozaic (https://ruismaker.com/mozaic/) on iOS:
 | midi_router.moz     | A simple switch panel / router to map incoming MIDI to a destination channel.  |
 | arpeggiator.moz     | A simple arpeggiator which can be used in any AUv3 host that supports MIDI plugins.  |
 | autosampler.moz     | An extension to support auto sampling of synths in apps |
+| yass.moz            | Yet another step sequencer with some tricks inside. |
