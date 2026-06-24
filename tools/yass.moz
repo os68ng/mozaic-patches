@@ -1,7 +1,7 @@
 // YASS - Yet Another Step Sequencer
 //
 // Author: os68ng
-// Version: 1.0
+// Version: 1.1
 // Licence: Do What The F*ck You Want To Public License
 //
 // Yet another step sequencer with some tricks.
@@ -12,8 +12,6 @@ Yet another sequencer with some tricks inside.
 - Hold shift to set divisions and play direction
 - Hold step to set note, velocity, probability and substeps
 - Holding a step you can use a keyboard to set the note
-
-Substeps follow a binary pattern ;-)
 
 Have fun!
 @End
@@ -100,9 +98,11 @@ Have fun!
     vel = notevel[step]
     prob = probabilities[step]
     subst = substeps[step]
-    gatetime = (60.0 / HostTempo) / (steps / HostBeatsPerMeasure) * gate / 100.0
+    substprob = substepprob[step]
+    // TODO optimize
+    gatetime = (60.0 / HostTempo) / (steps / HostBeatsPerMeasure) * gate * 10.0
     if (Random 0, 100) <= prob
-      if subst > 1
+      if subst > 1 and (Random 0, 100) <= substprob
         Call @GenerateSubsteps
       else
         if debug
@@ -156,10 +156,9 @@ Have fun!
     elseif knob = knobprob
       Call @SetProbability
       Call @LabelProbability
-    elseif knob = knobsubsteps
-      Call @SetSubsteps
-      Call @LabelSubsteps
-      Call @LabelPadSubsteps
+    elseif knob = knobsubstepprob
+      Call @SetSubstepProb
+      Call @LabelSubstepProb
     endif
   else
     if knob = knobsteps
@@ -190,15 +189,17 @@ Have fun!
   else
     if paddown < 0
       lpad = LastPad
+      paddown = LastPad
+      SetTimerInterval 200
+      StartTimer
+    else
+      Call @EditSubSteps
     endif
-    paddown = LastPad
-    SetTimerInterval 200
-    StartTimer
   endif
 @End
 
 @OnPadUp
-  if not ShiftPressed
+  if (not ShiftPressed) and (paddown = LastPad)
     paddown = -1
     Call @LabelKnobsNormal
     Call @LabelPadsSequence
@@ -237,23 +238,27 @@ Have fun!
   Call @UpdateSwing
   Call @UpdateGate
   LabelKnob 3, { }
+  SetKnobValue 3, 0
 @End
 
 @LabelKnobsPad
   pad = paddown
-  LabelKnobs {Step }, pad
+  LabelKnobs {Step }, pad+1
   Call @UpdateNote
   Call @UpdateVelocity
   Call @UpdateProbability
-  Call @UpdateSubsteps
+  Call @UpdateSubstepProb
 @End
 
 @LabelKnobsShift
   LabelKnobs { }
   Call @UpdateMidiCh
   LabelKnob 1, { }
+  SetKnobValue 1, 0
   LabelKnob 2, { }
+  SetKnobValue 2, 0
   LabelKnob 3, { }
+  SetKnobValue 3, 0
 @End
 
 @SetSteps
@@ -336,17 +341,38 @@ Have fun!
   LabelKnob knobprob, {Prob }, probabilities[pad], {%}
 @End
 
-@SetSubsteps
-  substeps[pad] = Clip ((Round knobval) + 1), 1, 127
+@EditSubsteps
+  spad = LastPad
+  if spad < 8
+    sstep = spad
+  elseif spad < 15
+    sstep = spad - 8
+  else
+    Exit
+  endif
+  if sstep < 7
+    sstate = substeps[lpad] & exp2n[sstep]
+    if sstate
+      substeps[lpad] = substeps[lpad] - exp2n[sstep]
+      LatchPad spad, NO
+    else
+      substeps[lpad] = substeps[lpad] + exp2n[sstep]
+      LatchPad spad, YES
+    endif
+  endif
 @End
 
-@UpdateSubsteps
-  SetKnobValue knobsubsteps, substeps[pad]
-  Call @LabelSubsteps
+@SetSubstepProb
+  substepprob[pad] = Round (knobval / 127.0 * 100.0)
 @End
 
-@LabelSubsteps
-  LabelKnob knobsubsteps, {Subst }, substeps[pad]
+@UpdateSubstepProb
+  SetKnobValue knobsubstepprob, substepprob[pad] / 100.0 * 127.0
+  Call @LabelSubstepProb
+@End
+
+@LabelSubstepProb
+  LabelKnob knobsubstepprob, {SPrb }, substepprob[pad], {%}
 @End
 
 @SetMidiCh
@@ -461,6 +487,7 @@ Have fun!
     FillArray notevel, defaultvel, 16
     FillArray probabilities, 100, 16
     FillArray substeps, 1, 16
+    FillArray substepprob, 100, 16
 
     divisions = [4, 6, 8, 12, 16, 24, 32, 48]
     exp2n = [1, 2, 4, 8, 16, 32, 64]
@@ -478,7 +505,7 @@ Have fun!
   knobnote = 0
   knobvel = 1
   knobprob = 2
-  knobsubsteps = 3
+  knobsubstepprob = 3
 
   knobmidich = 0
   
